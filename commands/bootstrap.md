@@ -135,16 +135,20 @@
 
 ### 3-2. settings.json
 
+**중요**: 모든 permission 항목은 반드시 `Bash(command)` 형식으로 작성해야 합니다. Tool name이 대문자로 시작해야 하는 규칙이 있으므로 bare command(`"npm test"`)는 에러가 발생합니다.
+
 ```json
 {
   "permissions": {
     "allow": [
-      // 프로젝트에서 실제 사용하는 커맨드만 허용
-      // 예: "npm test", "npm run lint", "pytest", "cargo test" 등
+      // 반드시 Bash(command) 형식 사용
+      // GOOD: "Bash(npm test)", "Bash(npm run lint)", "Bash(pytest)"
+      // BAD:  "npm test", "npm run lint", "pytest"
     ],
     "deny": [
-      // 위험한 커맨드 차단
-      // 예: "rm -rf /", "DROP TABLE", 프로덕션 배포 커맨드 등
+      // 위험한 커맨드도 동일 형식
+      // GOOD: "Bash(rm -rf /)", "Bash(DROP TABLE)"
+      // BAD:  "rm -rf /", "DROP TABLE"
     ]
   }
 }

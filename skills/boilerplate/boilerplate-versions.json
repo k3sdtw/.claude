@@ -1,0 +1,128 @@
+{
+  "_meta": {
+    "description": "보일러플레이트 커맨드에서 사용하는 기술스택 버전 레지스트리. 커맨드 실행 시 자동으로 최신 버전 체크 및 업데이트됨.",
+    "last_checked": "2025-02-07",
+    "last_updated": "2025-02-07"
+  },
+  "runtimes": {
+    "node": { "version": "22", "note": "LTS" },
+    "go": { "version": "1.23", "note": "latest stable" },
+    "python": { "version": "3.12", "note": "latest stable" }
+  },
+  "backend": {
+    "nestjs": {
+      "version": "11",
+      "typescript": "5.7",
+      "packages": {
+        "@nestjs/core": "^11.0.0",
+        "@nestjs/common": "^11.0.0",
+        "@nestjs/config": "^4.0.0",
+        "@nestjs/swagger": "^8.0.0",
+        "@nestjs/terminus": "^11.0.0",
+        "class-validator": "^0.14.0",
+        "class-transformer": "^0.5.0",
+        "helmet": "^8.0.0",
+        "compression": "^1.7.0"
+      },
+      "dev_packages": {
+        "jest": "^29.0.0",
+        "@nestjs/testing": "^11.0.0",
+        "supertest": "^7.0.0",
+        "ts-jest": "^29.0.0"
+      }
+    },
+    "go": {
+      "modules": {
+        "github.com/gin-gonic/gin": "v1.10",
+        "github.com/labstack/echo/v4": "v4.12",
+        "github.com/caarlos0/env/v11": "v11",
+        "github.com/go-playground/validator/v10": "v10",
+        "github.com/stretchr/testify": "v1.9"
+      }
+    },
+    "fastapi": {
+      "version": "0.115",
+      "packages": {
+        "fastapi": ">=0.115.0",
+        "uvicorn": ">=0.32.0",
+        "pydantic": ">=2.10.0",
+        "pydantic-settings": ">=2.7.0",
+        "structlog": ">=24.4.0"
+      },
+      "dev_packages": {
+        "pytest": ">=8.3.0",
+        "pytest-asyncio": ">=0.24.0",
+        "httpx": ">=0.28.0",
+        "ruff": ">=0.8.0"
+      }
+    }
+  },
+  "frontend": {
+    "react": {
+      "version": "19",
+      "vite": "6",
+      "packages": {
+        "react": "^19.0.0",
+        "react-dom": "^19.0.0",
+        "react-router": "^7.0.0",
+        "@tanstack/react-query": "^5.62.0",
+        "zustand": "^5.0.0",
+        "axios": "^1.7.0"
+      },
+      "dev_packages": {
+        "vitest": "^2.1.0",
+        "@testing-library/react": "^16.1.0",
+        "typescript": "^5.7.0"
+      }
+    },
+    "nextjs": {
+      "version": "15",
+      "packages": {
+        "next": "^15.1.0",
+        "react": "^19.0.0",
+        "react-dom": "^19.0.0",
+        "@tanstack/react-query": "^5.62.0",
+        "zustand": "^5.0.0",
+        "server-only": "^0.0.1"
+      },
+      "dev_packages": {
+        "vitest": "^2.1.0",
+        "@testing-library/react": "^16.1.0",
+        "typescript": "^5.7.0"
+      }
+    }
+  },
+  "standalone": {
+    "typescript": {
+      "packages": {
+        "tsup": "^8.3.0",
+        "tsx": "^4.19.0",
+        "commander": "^13.0.0"
+      }
+    },
+    "go": {
+      "modules": {
+        "github.com/spf13/cobra": "v1.8",
+        "github.com/spf13/viper": "v1.19"
+      }
+    },
+    "python": {
+      "packages": {
+        "typer": ">=0.15.0",
+        "click": ">=8.1.0"
+      }
+    }
+  },
+  "tooling": {
+    "biome": { "version": "1.9" },
+    "eslint": { "version": "9" },
+    "prettier": { "version": "3" },
+    "golangci_lint": { "version": "1.62" },
+    "ruff": { "version": "0.8" },
+    "turborepo": { "version": "2.3" },
+    "serverless": { "version": "4" },
+    "docker_node": { "base_image": "node:22-alpine" },
+    "docker_go": { "base_image": "golang:1.23-alpine" },
+    "docker_python": { "base_image": "python:3.12-slim" }
+  }
+}

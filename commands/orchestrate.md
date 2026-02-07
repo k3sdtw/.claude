@@ -1,11 +1,56 @@
 ---
-description: Full orchestrated workflow. Requirements → branch → plan → expert review → implement → verify → PR. Jira optional.
+description: Full orchestrated workflow. Requirements → branch → plan → expert review → implement → verify → PR. Jira optional. Profile-driven.
 ---
 
 # Orchestrate Development Workflow
 
 End-to-end development pipeline from requirements to Pull Request.
 Supports both Jira-tracked and standalone development.
+**Project-specific conventions are loaded from a profile**, not hardcoded here.
+
+---
+
+## Profile Loading (MUST be first step)
+
+Before starting any phase, load the project profile:
+
+### Detection Order
+
+1. `--profile {name}` flag → load `profiles/{name}.md`
+2. Auto-detect from project root:
+
+| Detected File | Inferred Profile |
+|---------------|-----------------|
+| `nest-cli.json`, `src/main.ts` | Search for NestJS backend profile |
+| `next.config.*`, `app/layout.tsx` | Search for Next.js frontend profile |
+| `package.json` → `"react"` in deps | Search for React frontend profile |
+| `pyproject.toml`, `manage.py` | Search for Python backend profile |
+| `go.mod` | Search for Go profile |
+| `Cargo.toml` | Search for Rust profile |
+
+3. If no profile found or ambiguous → **ask user**:
+
+```
+No project profile detected. Which profile should I use?
+- {list available profiles from profiles/ directory}
+- Create a new profile (I'll analyze the codebase)
+```
+
+### Profile Contract
+
+Every profile MUST define these sections (see bootstrap.md for generation):
+
+```
+[meta]          → project type, framework, architecture
+[experts]       → expert reviewer definitions (4 agents)
+[phases]        → implementation phase breakdown & agent assignments
+[verification]  → build, lint, test commands
+[conventions]   → commit format, branch naming, file naming
+```
+
+Set `PROFILE = {loaded profile}` and carry it through all phases.
+
+---
 
 ## Mode Detection
 
@@ -31,22 +76,25 @@ Set `MODE = jira | standalone` and carry it through all phases.
 
 ## Mandatory Rules
 
-1. **Always create a separate workspace.** Both Jira and standalone mode MUST work on a dedicated worktree or branch. Never develop on main.
-2. **Never skip a gate without explicit user approval.**
-3. **Expert reviews are always parallel after plan confirmation.**
+1. **Always load a profile first.** Never start implementation without a resolved profile.
+2. **Always create a separate workspace.** Both Jira and standalone mode MUST work on a dedicated worktree or branch. Never develop on main.
+3. **Never skip a gate without explicit user approval.**
+4. **Expert reviews are always parallel after plan confirmation.**
 
 ---
 
 ## Gate Rules
 
 ```
-[Phase 1: Start]    →  GATE 1: Plan Confirmation
-                           ↓
-[Phase 2: Review]   →  GATE 2: Expert Approval
-                           ↓
-[Phase 3: Impl]     →  (automatic)
-                           ↓
-[Phase 4: Done]     →  GATE 3: PR Confirmation
+[Profile Load]         →  (automatic)
+                            ↓
+[Phase 1: Start]       →  GATE 1: Plan Confirmation
+                            ↓
+[Phase 2: Review]      →  GATE 2: Expert Approval
+                            ↓
+[Phase 3: Impl]        →  (automatic)
+                            ↓
+[Phase 4: Done]        →  GATE 3: PR Confirmation
 ```
 
 ---
@@ -64,13 +112,18 @@ Set `MODE = jira | standalone` and carry it through all phases.
 
 ### 1-2. Requirements Q&A
 
-Conduct interactive interview (both modes):
+Conduct interactive interview (both modes).
 
+**Common questions (always ask):**
 - Purpose and user value
-- API endpoint spec (method, path, request/response)
-- Business rules and validation logic
+- Scope boundaries (what's in / out)
 - Error handling scenarios
 - External service integrations
+
+**Profile-specific questions (loaded from PROFILE):**
+- The profile MAY define additional Q&A prompts under `[requirements_qa]`
+- Example: backend profiles may ask about API endpoint spec, DB schema changes
+- Example: frontend profiles may ask about UI/UX spec, responsive breakpoints, state management needs
 
 **Output:** Structured requirements document
 
@@ -111,6 +164,7 @@ Set `WORKSPACE = worktree | branch` and carry it through all phases.
 **Always work on a separate workspace, regardless of mode.**
 
 Branch naming: use kebab-case, descriptive slug (e.g. `add-login-endpoint`).
+If the profile defines a branch prefix convention, apply it.
 
 **Worktree mode:**
 
@@ -122,7 +176,7 @@ git gtr new {JIRA-KEY}-{feature-slug}
 git gtr new {feature-slug}
 ```
 
-> Auto-runs: `.env` copy + `pnpm install` (when using gtr)
+> Auto-runs: `.env` copy + dependency install (when using gtr)
 > After creation, **cd into the new worktree directory** to continue work there.
 
 **Branch mode:**
@@ -142,10 +196,11 @@ git checkout -b {feature-slug}
 
 Plan contents:
 - Jira link (Jira mode only)
+- **Profile used** (name and key conventions)
 - Requirements summary
-- Affected layers (db, core, app)
-- Implementation phases (Domain → Infra → App → Test)
-- Parallel agent assignment table
+- Affected layers (loaded from `PROFILE[phases]`)
+- Implementation phases (loaded from `PROFILE[phases]`)
+- Parallel agent assignment table (loaded from `PROFILE[phases]`)
 - Risk assessment
 
 ---
@@ -156,6 +211,7 @@ Plan contents:
 
 ```
 Plan written to plans/{plan-file}.
+Profile: {profile name}
 Should I proceed to expert review?
 - Yes → continue
 - Need changes → edit and re-confirm
@@ -168,45 +224,27 @@ Should I proceed to expert review?
 ## Phase 2: Expert Review (4 Parallel Agents)
 
 After plan confirmation, launch **4 expert review agents in parallel**.
-Each agent reviews the plan from its specialized perspective.
+**Agent definitions are loaded from `PROFILE[experts]`.**
 
 ### 2-1. Launch Parallel Expert Reviews
 
+Load all 4 expert agents from the profile. Each profile defines:
+- Agent name and role
+- Review focus areas
+- Checklist items specific to the project's architecture and conventions
+
 ```
-Agent 1 — Schema Designer:
-  Review the plan for database/schema concerns:
-  - Table structure and relationships
-  - Index strategy
-  - Migration safety
-  - Data integrity constraints
-  - Naming conventions for tables/columns
+Agent 1 — {PROFILE.experts[0].name}:
+  {PROFILE.experts[0].review_focus}
 
-Agent 2 — Architect:
-  Review the plan for architectural fitness:
-  - Hexagonal architecture layer separation
-  - Correct dependency direction (Presentation → App → Domain ← Infra)
-  - DI with Symbol tokens
-  - Entity immutability pattern (private constructor + factory)
-  - Bounded context boundaries
-  - Domain event needs
+Agent 2 — {PROFILE.experts[1].name}:
+  {PROFILE.experts[1].review_focus}
 
-Agent 3 — Code Reviewer:
-  Review the plan for implementation quality:
-  - Requirements completeness (all endpoints, error cases, validation)
-  - Correct implementation order (Domain → Infra → App)
-  - Parallel agent work distribution soundness
-  - No file conflicts between agents
-  - Naming conventions
-  - E2E test scenario coverage
+Agent 3 — {PROFILE.experts[2].name}:
+  {PROFILE.experts[2].review_focus}
 
-Agent 4 — Security Reviewer:
-  Review the plan for security concerns:
-  - Authentication/authorization requirements
-  - Input validation strategy
-  - SQL injection prevention
-  - Sensitive data exposure risks
-  - Rate limiting needs
-  - OWASP Top 10 relevance
+Agent 4 — {PROFILE.experts[3].name}:
+  {PROFILE.experts[3].review_focus}
 ```
 
 ### 2-2. Aggregate Results
@@ -216,16 +254,16 @@ Collect all 4 expert reviews and present a unified report:
 ```markdown
 ## Expert Review Results
 
-### Schema Design Review
+### {Expert 1 Name} Review
 - {findings or "No issues"}
 
-### Architecture Review
+### {Expert 2 Name} Review
 - {findings or "No issues"}
 
-### Code Quality Review
+### {Expert 3 Name} Review
 - {findings or "No issues"}
 
-### Security Review
+### {Expert 4 Name} Review
 - {findings or "No issues"}
 
 ### Action Required
@@ -250,10 +288,10 @@ If CRITICAL or HIGH issues found:
 ## Expert Review Summary
 
 ### Passed
-- [Schema] No migration issues
-- [Architecture] Layer separation correct
-- [Code] All endpoints covered
-- [Security] Auth requirements specified
+- [{Expert 1}] {summary}
+- [{Expert 2}] {summary}
+- [{Expert 3}] {summary}
+- [{Expert 4}] {summary}
 
 ### Fixed (if any)
 1. {what was wrong} → {how it was fixed}
@@ -275,36 +313,32 @@ Update plan status to approved.
 
 Read the plan file and extract agent assignments.
 
-### 3-2. Execute Parallel Agents
+### 3-2. Execute Agents (from Profile)
 
-**Phase 3a — Domain + Mapper (parallel):**
+**Phase structure is loaded from `PROFILE[phases]`.**
 
-Agent 1 (Domain Layer):
-- Entity with private constructor + create()/reconstitute()
-- Repository Interface with Symbol token
-- Domain Errors extending DomainError
-- index.ts exports
+The profile defines:
+- Which phases run in parallel vs sequential
+- What each agent produces
+- Dependencies between phases
 
-Agent 2 (Infrastructure Layer):
-- Mapper (toDomain / toPersistence)
-- Repository Implementation (after Agent 1 Interface is available)
-- index.ts exports
+Example (the profile controls this, not orchestrate):
 
-**Phase 3b — Application (sequential, after 3a):**
+```
+Phase 3a (parallel) → PROFILE.phases.parallel_first
+Phase 3b (sequential, after 3a) → PROFILE.phases.sequential_after
+```
 
-Agent 3 (Application Layer):
-- Use Case with @Transactional()
-- Controller with Swagger decorators
-- Request/Response DTOs
-- Module registration
-- E2E Test
+Each agent follows the implementation order, file templates, and naming conventions specified in the profile.
 
 ### 3-3. Integration Verification
 
+Run verification commands **from `PROFILE[verification]`**:
+
 ```bash
-pnpm biome check --write .
-pnpm build
-pnpm test:e2e:gifca
+{PROFILE.verification.lint}
+{PROFILE.verification.build}
+{PROFILE.verification.test}
 ```
 
 If build or test fails, fix and re-verify (max 3 attempts).
@@ -317,15 +351,15 @@ If build or test fails, fix and re-verify (max 3 attempts).
 
 ```
 LOOP (max 3 iterations):
-  1. pnpm biome check --write .
-  2. pnpm build          → fail? fix, RESTART
-  3. pnpm test:e2e:gifca → fail? fix, RESTART
+  1. {PROFILE.verification.lint}
+  2. {PROFILE.verification.build}   → fail? fix, RESTART
+  3. {PROFILE.verification.test}    → fail? fix, RESTART
   4. All green → EXIT
 ```
 
 ### 4-2. Code Review (parallel agents)
 
-Launch **security-reviewer** and **code-reviewer** in parallel.
+Launch **security-reviewer** and **code-reviewer** from `PROFILE[experts]` in parallel.
 
 If CRITICAL or HIGH issues found → fix and re-run verification loop.
 
@@ -333,11 +367,11 @@ If CRITICAL or HIGH issues found → fix and re-run verification loop.
 
 ```bash
 git add {specific files only}
-git commit -m "<type>(<scope>): <description>"
+git commit -m "{PROFILE.conventions.commit_format}"
 ```
 
 - Stage specific files (never `git add .` or `git add -A`)
-- Follow conventional commit format
+- Follow commit convention from profile (e.g., conventional commits, gitmoji, etc.)
 
 ---
 
@@ -349,9 +383,9 @@ git commit -m "<type>(<scope>): <description>"
 ## Pre-PR Summary
 
 ### Verification
-- Biome: pass
+- Lint: pass
 - Build: pass
-- E2E Test: X/Y pass
+- Test: X/Y pass
 - Security Review: no critical issues
 - Code Review: no critical issues
 
@@ -372,7 +406,7 @@ Ready to create PR and push?
 **Jira mode:**
 ```bash
 git push -u origin {branch}
-gh pr create --title "{type}({scope}): {description} {JIRA-KEY}" --body "$(cat <<'EOF'
+gh pr create --title "{PROFILE.conventions.commit_format} {JIRA-KEY}" --body "$(cat <<'EOF'
 ## 개요
 {what this PR does}
 
@@ -381,7 +415,7 @@ gh pr create --title "{type}({scope}): {description} {JIRA-KEY}" --body "$(cat <
 - {change 2}
 
 ## 테스트
-- [x] E2E 테스트 추가
+- [x] 테스트 추가
 - [x] 로컬 테스트 완료
 - [x] 기존 테스트 통과
 EOF
@@ -391,7 +425,7 @@ EOF
 **Standalone mode:**
 ```bash
 git push -u origin {branch}
-gh pr create --title "{type}({scope}): {description}" --body "$(cat <<'EOF'
+gh pr create --title "{PROFILE.conventions.commit_format}" --body "$(cat <<'EOF'
 ## 개요
 {what this PR does}
 
@@ -400,7 +434,7 @@ gh pr create --title "{type}({scope}): {description}" --body "$(cat <<'EOF'
 - {change 2}
 
 ## 테스트
-- [x] E2E 테스트 추가
+- [x] 테스트 추가
 - [x] 로컬 테스트 완료
 - [x] 기존 테스트 통과
 EOF
@@ -426,18 +460,21 @@ mcp__jira__jira_transition_issue({
 ## Development Complete
 
 ### Tracking
-- {Jira mode: "Jira: GIFCA-123" | Standalone mode: "Branch: add-login-endpoint"}
+- {Jira mode: "Jira: {JIRA-KEY}" | Standalone mode: "Branch: {branch}"}
+
+### Profile
+- {profile name}
 
 ### Expert Reviews
-- Schema: pass
-- Architecture: pass
-- Code Quality: pass
-- Security: pass
+- {Expert 1}: pass
+- {Expert 2}: pass
+- {Expert 3}: pass
+- {Expert 4}: pass
 
 ### Verification
-- Biome: pass
+- Lint: pass
 - Build: pass
-- E2E Test: X/Y pass
+- Test: X/Y pass
 
 ### Pull Request
 - URL: {PR URL}
@@ -463,19 +500,26 @@ If the session breaks, resume from any phase:
 /orchestrate:done     → Phase 4
 ```
 
+When resuming, the profile is re-loaded from the plan file's "Profile used" field.
+
 ## Examples
 
 ```
 /orchestrate GIFCA-123
 ```
-→ Jira mode: fetch issue → Q&A → branch → plan → expert review → impl → verify → PR
+→ Auto-detect profile → Jira mode: fetch issue → Q&A → branch → plan → expert review → impl → verify → PR
+
+```
+/orchestrate GIFCA-456 --profile gifca-frontend
+```
+→ Load frontend profile → Jira mode: full pipeline with frontend conventions
+
+```
+/orchestrate --no-jira --profile gifca-frontend add dashboard page
+```
+→ Standalone mode + frontend profile: Q&A → branch → plan → expert review → impl → verify → PR
 
 ```
 /orchestrate add voucher expiration notification
 ```
-→ Ask Jira or standalone → full pipeline
-
-```
-/orchestrate --no-jira add health check endpoint
-```
-→ Standalone mode: Q&A → branch → plan → expert review → impl → verify → PR
+→ Auto-detect profile → Ask Jira or standalone → full pipeline

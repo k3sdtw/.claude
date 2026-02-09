@@ -34,21 +34,23 @@ mcp__jira__jira_create_issue({
 })
 ```
 
-## 4. Workspace Detection
+## 4. Workspace Detection (worktree preferred)
 
 ```bash
 git gtr list 2>/dev/null
 ```
-- Succeeds or `.git` is a file → `WORKSPACE = worktree`
-- Otherwise → `WORKSPACE = branch`
+- **gtr available** → `WORKSPACE = worktree` (default, always preferred)
+- **gtr not installed** → `WORKSPACE = branch` (fallback only)
+
+> If already inside a worktree (`.git` is a file), still set `WORKSPACE = worktree`
 
 ## 5. Create Workspace (MANDATORY — never develop on main)
 
-**Worktree:** `git gtr new {JIRA-KEY}-{slug}` (or `{slug}` for standalone)
+**Worktree (default):** `git gtr new {JIRA-KEY}-{slug}` (or `{slug}` for standalone)
 - Auto-runs `.env` copy + `pnpm install`
 - **cd into new worktree** after creation
 
-**Branch:** `git checkout -b {JIRA-KEY}-{slug}` (or `{slug}` for standalone)
+**Branch (only when gtr is not installed):** `git checkout -b {JIRA-KEY}-{slug}` (or `{slug}` for standalone)
 
 ## 6. Write Plan
 

@@ -37,8 +37,9 @@ Set `MODE = jira | standalone`.
 
 1. Always load profile first
 2. Always create separate workspace (never develop on main)
-3. Never skip a gate without user approval
-4. Expert reviews always run in parallel
+3. **Worktree first** — always use worktree when gtr is available. Branch fallback only when gtr is not installed
+4. Never skip a gate without user approval
+5. Expert reviews always run in parallel
 
 ## Pipeline Flow
 

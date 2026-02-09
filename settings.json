@@ -11,13 +11,25 @@
 		"deny": ["Bash(git reset*)", "Bash(git rebase*)", "Bash(rm -rf *)"]
 	},
 	"hooks": {
+		"SessionStart": [
+			{
+				"matcher": "startup|resume|clear|compact",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "${CLAUDE_PLUGIN_ROOT}/hooks/session-start.sh",
+						"async": true
+					}
+				]
+			}
+		],
 		"PreToolUse": [
 			{
 				"matcher": "*",
 				"hooks": [
 					{
 						"type": "command",
-						"command": "/home/ubuntu/.claude/skills/continuous-learning-v2/hooks/observe.sh pre"
+						"command": "~/.claude/skills/continuous-learning-v2/hooks/observe.sh pre"
 					}
 				]
 			}
@@ -28,7 +40,7 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "/home/ubuntu/.claude/skills/continuous-learning-v2/hooks/observe.sh post"
+						"command": "~/.claude/skills/continuous-learning-v2/hooks/observe.sh post"
 					}
 				]
 			}

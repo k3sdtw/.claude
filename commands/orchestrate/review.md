@@ -1,42 +1,78 @@
 ---
-description: Expert review of the plan. 4 parallel agents (schema, architecture, code, security) review and approve.
+description: Expert review of the plan. Context-aware agent groups (backend/frontend/fullstack) review and approve.
 ---
 
 # Expert Plan Review
 
-Review plan with 4 parallel expert agents. Prerequisite: plan from `/orchestrate:start`.
+Review plan with parallel expert agents selected by project context.
+Prerequisite: plan from `/orchestrate:start`.
 
 ## 1. Locate Plan
 
 Read most recent `plans/*.md` or user-specified plan.
 
-## 2. Launch 4 Expert Reviews (Parallel Task agents)
+## 2. Select Agent Group
 
-All agents report as: `[CRITICAL/HIGH/MEDIUM/LOW] Finding → Recommendation` or "No concerns".
+Determine group from context. Use the FIRST match:
 
-**Agent 1 — Schema Designer** (`schema-designer`):
-Review for: table structure/relationships, index strategy, migration safety, data integrity constraints, naming conventions, data type appropriateness.
+| Condition | Group |
+|-----------|-------|
+| `--group backend` or `--group frontend` flag | As specified |
+| `PROFILE[meta.type]` is set | Use profile value |
+| `nest-cli.json` or `src/main.ts` exists | BACKEND |
+| `next.config.*` or `app/layout.tsx` exists | FRONTEND |
+| Both detected | FULLSTACK |
+| None detected | Ask user |
 
-**Agent 2 — Architect** (`architect`):
-Review for: layer separation, dependency direction (Presentation → App → Domain ← Infra), DI tokens, entity immutability, bounded context boundaries, domain events, circular dependencies.
+## 3. Agent Group Definitions
 
-**Agent 3 — Code Reviewer** (`code-reviewer`):
-Review for: API endpoint coverage, error handling (400/401/403/404/409), validation rules, E2E test scenarios, implementation order, agent work distribution, file conflicts, naming conventions.
+### BACKEND_GROUP (5 agents)
 
-**Agent 4 — Security Reviewer** (`security-reviewer`):
-Review for: authentication, authorization, input validation, SQL injection prevention, sensitive data exposure, rate limiting, OWASP Top 10.
+| # | Agent Type | Review Focus |
+|---|-----------|-------------|
+| 1 | `schema-designer` | Table structure, relationships, indexes, migration safety, constraints, naming |
+| 2 | `architect` | Layer separation, dependency direction, DI tokens, bounded context, domain events |
+| 3 | `api-designer` | REST conventions, error response format, pagination, versioning, DTO boundaries |
+| 4 | `security-reviewer` | SQL injection, auth/authz bypass, rate limiting, sensitive data exposure, input validation |
+| 5 | `performance-reviewer` | N+1 queries, missing indexes, caching strategy, connection management, transaction scope |
 
-## 3. Aggregate & Fix
+### FRONTEND_GROUP (4 agents)
 
-Present unified report with severity counts. If CRITICAL/HIGH found → fix plan and report changes.
+| # | Agent Type | Review Focus |
+|---|-----------|-------------|
+| 1 | `architect` | Component structure, state management, routing, code splitting, module boundaries |
+| 2 | `ux-reviewer` | Accessibility (a11y), responsive design, loading/error/empty states, interaction patterns |
+| 3 | `security-reviewer` | XSS, CSP, token storage, CORS, third-party script risks, sensitive data in client |
+| 4 | `performance-reviewer` | Bundle size, rendering optimization, lazy loading, request waterfall, memory leaks |
 
-## 4. Approve
+### FULLSTACK_GROUP (6 agents)
+
+All BACKEND_GROUP agents + `ux-reviewer` from FRONTEND_GROUP.
+(Schema/Architect/API/Security cover both layers; add UX for frontend surface.)
+
+## 4. Launch Reviews (Parallel)
+
+Launch ALL agents in the selected group simultaneously via Task tool.
+
+Each agent prompt:
+```
+Review the plan at plans/{plan-file}.md.
+Focus: {review focus from group table above}
+Report: [CRITICAL/HIGH/MEDIUM/LOW] Finding → Recommendation. "No concerns" if clean.
+```
+
+## 5. Aggregate & Fix
+
+Present unified report with severity counts per agent.
+CRITICAL/HIGH found → fix plan, report changes.
+
+## 6. Approve
 
 When all CRITICAL/HIGH resolved, update plan:
 ```
 Status: Plan approved — proceed with /orchestrate:impl
 Approved: {date}
-Reviews: Schema OK | Architecture OK | Code OK | Security OK
+Reviews: {Agent1} OK | {Agent2} OK | ...
 ```
 
 **GATE: Ask user confirmation before proceeding.**

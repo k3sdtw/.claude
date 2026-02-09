@@ -8,10 +8,14 @@ Located in `~/.claude/agents/`:
 |-------|---------|-------------|
 | planner | Implementation planning | Complex features, refactoring |
 | architect | System design | Architectural decisions |
-| schema-designer | Database Schema design | Schema changes, creating |
-| tdd-guide | Test-driven development | New features, bug fixes |
+| schema-designer | Database schema design | Schema changes, creating |
+| api-designer | REST API design review | API endpoint design, contract review |
+| tdd-nestjs | NestJS E2E TDD | Backend features, bug fixes |
+| tdd-react | React component TDD | Frontend features, components, hooks |
 | code-reviewer | Code review | After writing code |
 | security-reviewer | Security analysis | Before commits |
+| performance-reviewer | Performance review | Query, rendering, bundle optimization |
+| ux-reviewer | Frontend UX review | Accessibility, responsive, interaction |
 | build-error-resolver | Fix build errors | When build fails |
 
 ## Immediate Agent Usage
@@ -19,7 +23,8 @@ Located in `~/.claude/agents/`:
 No user prompt needed:
 1. Complex feature requests - Use **planner** agent
 2. Code just written/modified - Use **code-reviewer** agent
-3. Bug fix or new feature - Use **tdd-guide** agent
+3. Backend bug fix or feature - Use **tdd-nestjs** agent
+6. Frontend bug fix or feature - Use **tdd-react** agent
 4. Architectural decision - Use **architect** agent
 5. Schema changes or creating - Use **schema-designer** agent
 

@@ -1,41 +1,41 @@
 {
-  "permissions": {
-    "allow": [
-      "Bash",
-      "Read",
-      "Edit(**)",
-      "Read(**)",
-      "Write(**)",
-      "Search(**)"
-    ],
-    "deny": [
-      "Bash(git reset*)",
-      "Bash(git rebase*)",
-      "Bash(rm -rf *)"
-    ]
-  },
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/home/ubuntu/.claude/skills/continuous-learning-v2/hooks/observe.sh pre"
-          }
-        ]
-      }
-    ],
-    "PostToolUse": [
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/home/ubuntu/.claude/skills/continuous-learning-v2/hooks/observe.sh post"
-          }
-        ]
-      }
-    ]
-  }
+	"permissions": {
+		"allow": [
+			"Bash",
+			"Read",
+			"Edit(**)",
+			"Read(**)",
+			"Write(**)",
+			"Search(**)"
+		],
+		"deny": ["Bash(git reset*)", "Bash(git rebase*)", "Bash(rm -rf *)"]
+	},
+	"hooks": {
+		"PreToolUse": [
+			{
+				"matcher": "*",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "/home/ubuntu/.claude/skills/continuous-learning-v2/hooks/observe.sh pre"
+					}
+				]
+			}
+		],
+		"PostToolUse": [
+			{
+				"matcher": "*",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "/home/ubuntu/.claude/skills/continuous-learning-v2/hooks/observe.sh post"
+					}
+				]
+			}
+		]
+	},
+	"statusLine": {
+		"type": "command",
+		"command": "~/.claude/cc-chips/engine.sh"
+	}
 }

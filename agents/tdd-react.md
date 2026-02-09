@@ -159,3 +159,15 @@ pnpm test -- --coverage                       # Coverage report
 ```
 
 **Rule: No component without tests. Write tests FIRST, then implement.**
+
+## React/Next.js Performance Best Practices
+
+When writing or modifying React/Next.js code, you MUST follow the Vercel React Best Practices.
+
+**Reference:** Read `~/.claude/skills/vercel-react-best-practices/AGENTS.md` before implementing components.
+
+Key priorities to always check:
+1. **Eliminate waterfalls** — parallel fetches, defer await, Suspense boundaries
+2. **Optimize bundle size** — avoid barrel imports, use dynamic imports, defer third-party scripts
+3. **Server-side performance** — React.cache(), minimize client serialization, parallel fetching
+4. **Re-render optimization** — derive state during render, functional setState, primitive deps

@@ -103,3 +103,16 @@ Add your project-specific checks here. Examples:
 - Validate cache fallback behavior
 
 Customize based on your project's `CLAUDE.md` or skill files.
+
+## React/Next.js Performance Review
+
+When reviewing React/Next.js code, you MUST check against the Vercel React Best Practices.
+
+**Reference:** Read `~/.claude/skills/vercel-react-best-practices/AGENTS.md` for full rules.
+
+Critical checks:
+- **Waterfall patterns** — sequential awaits, missing Promise.all(), no Suspense boundaries
+- **Bundle bloat** — barrel file imports, missing dynamic imports, eagerly loaded third-party scripts
+- **Server performance** — duplicate serialization in RSC props, missing React.cache(), blocking operations
+- **Unnecessary re-renders** — state subscriptions in callbacks, non-primitive effect deps, missing memoization
+- **Client-side fetch** — missing SWR/dedup, duplicated event listeners, unversioned localStorage

@@ -14,14 +14,17 @@ gtr은 worktree 생성 시 환경 파일(.env) 복사와 의존성 설치를 자
 
 ## 현재 프로젝트 설정
 
+`.gtrconfig`:
+```ini
+[copy]
+include = **/.env
+include = **/.env.test
+
+[hooks]
+postCreate = pnpm install --frozen-lockfile
 ```
-gtr.copy.include = apps/gifca/app/.env
-gtr.copy.include = apps/gifca/app/.env.test
-gtr.copy.include = apps/gifca/db/.env
-gtr.hook.postcreate = pnpm install
-gtr.editor.default = cursor
-gtr.worktree.base = ..
-```
+
+매칭 파일: `app/.env`, `admin/.env`, `db/.env`, `app/.env.test`, `admin/.env.test`
 
 ## 핵심 명령어
 

@@ -6,6 +6,27 @@ description: Implement with parallel agents. Plan-based Domain/Infra/App layer d
 
 Implement approved plan using parallel agents. Prerequisite: plan approved via `/orchestrate:review`.
 
+## 0. Worktree Guard (MUST run first)
+
+```bash
+# Find plan and extract worktree path
+PLAN_FILE=$(ls -t plans/*.md 2>/dev/null | head -1)
+WORKTREE_PATH=$(grep "^Worktree:" "$PLAN_FILE" | awk '{print $2}')
+
+# If not in worktree, cd into it
+if [ -n "$WORKTREE_PATH" ] && [ "$(pwd)" != "$WORKTREE_PATH" ]; then
+  cd "$WORKTREE_PATH"
+fi
+
+# Verify not on main
+if [ "$(git branch --show-current)" = "main" ]; then
+  echo "ERROR: On main branch. Must cd into worktree first."
+  exit 1
+fi
+```
+
+If `Worktree:` field is missing from plan or path doesn't exist → STOP and ask user for worktree path.
+
 ## 1. Load Plan
 
 Get branch name (`git branch --show-current`), read `plans/{identifier}.md`, extract agent assignments from "Parallel Agent Assignment" section.

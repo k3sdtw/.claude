@@ -44,20 +44,42 @@ git gtr list 2>/dev/null
 
 > If already inside a worktree (`.git` is a file), still set `WORKSPACE = worktree`
 
-## 5. Create Workspace (MANDATORY — never develop on main)
+## 5. Create Workspace & Enter Worktree (MANDATORY — never develop on main)
 
-**Worktree (default):** `git gtr new {JIRA-KEY}-{slug}` (or `{slug}` for standalone)
-- Auto-runs `.env` copy + `pnpm install`
-- **cd into new worktree** after creation
+**Worktree (default):**
+
+```bash
+# 1. Save main repo root for later reference
+MAIN_REPO=$(git rev-parse --show-toplevel)
+
+# 2. Create worktree
+BRANCH_NAME="{JIRA-KEY}-{slug}"  # or "{slug}" for standalone
+git gtr new "$BRANCH_NAME"
+
+# 3. Get worktree path and cd into it
+WORKTREE_PATH=$(git worktree list --porcelain | grep -A1 "branch.*$BRANCH_NAME" | head -1 | awk '{print $2}')
+cd "$WORKTREE_PATH"
+
+# 4. Verify we are in the worktree (MUST pass before continuing)
+[ "$(git branch --show-current)" = "$BRANCH_NAME" ] || echo "ERROR: Failed to enter worktree"
+```
+
+- Auto-runs `.env` copy + `pnpm install` via gtr hooks
+- **MUST `cd` into worktree and verify before writing the plan**
+- All subsequent work (plan writing, file edits) happens inside the worktree
 
 **Branch (only when gtr is not installed):** `git checkout -b {JIRA-KEY}-{slug}` (or `{slug}` for standalone)
 
-## 6. Write Plan
+## 6. Write Plan (inside worktree)
 
 File: `plans/{jira-key}.md` or `plans/{slug}.md`
 
+**IMPORTANT:** The plan file is written inside the worktree directory, NOT the main repo.
+
 Contents:
 - Tracking (Jira link or branch name)
+- **Worktree: `{absolute path to worktree directory}`** ← REQUIRED for subsequent phases
+- **Main repo: `{absolute path to main repo}`** ← for reference
 - Profile used
 - Requirements summary
 - Affected layers (from `PROFILE[phases]`)
@@ -68,8 +90,9 @@ Contents:
 ## Done Criteria
 
 - Requirements clarified
-- Workspace created
-- Plan written
+- Worktree created and **currently inside worktree directory**
+- Plan written (inside worktree, contains `Worktree:` path)
 - Jira confirmed (if Jira mode)
+- Verify: `pwd` outputs worktree path, `git branch --show-current` is NOT main
 
 → Next: `/orchestrate:review`

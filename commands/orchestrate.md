@@ -38,24 +38,48 @@ Set `MODE = jira | standalone`.
 1. Always load profile first
 2. Always create separate workspace (never develop on main)
 3. **Worktree first** — always use worktree when gtr is available. Branch fallback only when gtr is not installed
-4. Never skip a gate without user approval
-5. Expert reviews always run in parallel
+4. **Worktree context** — all phases MUST run inside the worktree directory. Every sub-command starts with a Worktree Guard that verifies `pwd` matches the worktree path stored in the plan file
+5. Never skip a gate without user approval
+6. Expert reviews always run in parallel
 
 ## Pipeline Flow
 
 ```
 [Profile Load] → automatic
      ↓
-[Phase 1: Start]  → GATE 1: Plan Confirmation
+[Phase 1: Start]  → create worktree → cd into worktree → GATE 1: Plan Confirmation
      ↓
-[Phase 2: Review]  → GATE 2: Expert Approval
+[Phase 2: Review]  → worktree guard → GATE 2: Expert Approval
      ↓
-[Phase 3: Impl]    → automatic
+[Phase 3: Impl]    → worktree guard → automatic
      ↓
-[Phase 4: Done]    → GATE 3: PR Confirmation
+[Phase 4: Done]    → worktree guard → GATE 3: PR Confirmation
 ```
 
 Each phase maps to a sub-command. Gates require explicit user confirmation before proceeding.
+
+## Worktree Guard (all phases except Start)
+
+Every sub-command (review/impl/done) MUST begin with:
+
+```bash
+# 1. Read worktree path from plan file
+WORKTREE_PATH=$(grep "^Worktree:" plans/*.md | head -1 | awk '{print $2}')
+
+# 2. Verify current directory
+if [ "$(pwd)" != "$WORKTREE_PATH" ]; then
+  cd "$WORKTREE_PATH"  # Auto-recover: cd into worktree
+fi
+
+# 3. Verify branch (not on main)
+CURRENT_BRANCH=$(git branch --show-current)
+if [ "$CURRENT_BRANCH" = "main" ]; then
+  echo "ERROR: On main branch. Must be in worktree."
+  exit 1
+fi
+```
+
+If worktree path is missing from plan or directory doesn't exist, STOP and ask user.
 
 ## Resuming Mid-Workflow
 
@@ -67,6 +91,7 @@ Each phase maps to a sub-command. Gates require explicit user confirmation befor
 ```
 
 Profile is re-loaded from plan file's "Profile used" field on resume.
+Worktree path is read from plan file's "Worktree" field to auto-`cd` on resume.
 
 ## Examples
 

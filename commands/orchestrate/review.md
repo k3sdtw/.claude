@@ -7,6 +7,27 @@ description: Expert review of the plan. Context-aware agent groups (backend/fron
 Review plan with parallel expert agents selected by project context.
 Prerequisite: plan from `/orchestrate:start`.
 
+## 0. Worktree Guard (MUST run first)
+
+```bash
+# Read worktree path from plan
+PLAN_FILE=$(ls -t plans/*.md 2>/dev/null | head -1)
+WORKTREE_PATH=$(grep "^Worktree:" "$PLAN_FILE" | awk '{print $2}')
+
+# If not in worktree, cd into it
+if [ -n "$WORKTREE_PATH" ] && [ "$(pwd)" != "$WORKTREE_PATH" ]; then
+  cd "$WORKTREE_PATH"
+fi
+
+# Verify not on main
+if [ "$(git branch --show-current)" = "main" ]; then
+  echo "ERROR: On main branch. Must cd into worktree first."
+  exit 1
+fi
+```
+
+If `Worktree:` field is missing from plan or path doesn't exist → STOP and ask user for worktree path.
+
 ## 1. Locate Plan
 
 Read most recent `plans/*.md` or user-specified plan.

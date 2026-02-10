@@ -30,9 +30,9 @@ git gtr copy <branch-name> -n
 
 ## 현재 동기화 대상
 
-- `apps/gifca/app/.env`
-- `apps/gifca/app/.env.test`
-- `apps/gifca/db/.env`
+`.gtrconfig` glob 패턴 기반:
+- `**/.env` → `apps/gifca/app/.env`, `apps/gifca/admin/.env`, `apps/gifca/db/.env`
+- `**/.env.test` → `apps/gifca/app/.env.test`, `apps/gifca/admin/.env.test`
 
 ## 예시
 

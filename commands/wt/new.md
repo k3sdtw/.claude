@@ -44,11 +44,10 @@ git gtr list
 
 ## 자동 설정 항목
 
-gtr 설정에 의해 자동 실행:
-- `apps/gifca/app/.env` 복사
-- `apps/gifca/app/.env.test` 복사
-- `apps/gifca/db/.env` 복사
-- `pnpm install` 실행
+gtr 설정(`.gtrconfig`)에 의해 자동 실행:
+- `**/.env` 패턴 매칭 파일 복사 (`app/.env`, `admin/.env`, `db/.env`)
+- `**/.env.test` 패턴 매칭 파일 복사 (`app/.env.test`, `admin/.env.test`)
+- `pnpm install --frozen-lockfile` 실행
 
 ## 예시
 

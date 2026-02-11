@@ -112,15 +112,27 @@ E2E pipeline: requirements → branch → plan → expert review → implement �
 6. **필드 추출**: state에서 이번 phase에 필요한 값을 변수로 보관 (jiraKey, projectType, techStack, commands, planFile, branchName, baseBranch 등)
 7. **Phase 진입**: state의 `currentPhase`를 현재 phase로, `updatedAt`을 현재 시각으로 갱신 → Write로 저장
 
+## gtr 명령어 (CRITICAL)
+
+gtr은 Git subcommand다. **반드시 `git gtr`로 실행한다.**
+
+```
+CORRECT:  git gtr new <branch>
+WRONG:    gtr new <branch>        ← command not found
+```
+
+상세 레퍼런스: `~/.claude/rules/common/gtr-reference.md`
+
 ## Mandatory Rules
 
 1. 반드시 프로젝트 컨텍스트를 먼저 파악한다 (CLAUDE.md 기반)
 2. 반드시 별도 workspace를 생성한다 (main에서 직접 개발 금지)
-3. **Worktree 우선** — gtr이 설치되어 있으면 항상 worktree 사용. gtr 미설치 시에만 branch fallback
-4. **Worktree 컨텍스트** — 모든 phase는 worktree 디렉토리 안에서 실행
-5. Gate를 사용자 승인 없이 건너뛰지 않는다
-6. Expert review는 반드시 병렬 실행한다
-7. **State JSON이 권위적 소스** — 에이전트는 state JSON에서 읽되, plan markdown을 파싱하지 않는다
+3. **Worktree 우선** — `git gtr list`가 성공하면 항상 worktree 사용. 실패 시에만 branch fallback
+4. **gtr 실행 형식** — 항상 `git gtr ...` 형태로 호출. `gtr ...`로 직접 호출 금지
+5. **Worktree 컨텍스트** — 모든 phase는 worktree 디렉토리 안에서 실행
+6. Gate를 사용자 승인 없이 건너뛰지 않는다
+7. Expert review는 반드시 병렬 실행한다
+8. **State JSON이 권위적 소스** — 에이전트는 state JSON에서 읽되, plan markdown을 파싱하지 않는다
 
 ## Idempotency (재진입 처리)
 

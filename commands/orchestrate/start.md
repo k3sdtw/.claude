@@ -60,8 +60,15 @@ mcp__jira__jira_create_issue({
 
 ## 4. Workspace Detection
 
+> **CRITICAL: gtr은 Git subcommand다. 반드시 `git gtr`로 실행해야 한다. `gtr` 단독 실행은 command not found.**
+
 ```bash
+# CORRECT — 반드시 이 형태로 실행
 git gtr list 2>/dev/null && echo "GTR_AVAILABLE" || echo "GTR_NOT_AVAILABLE"
+
+# WRONG — 절대 이렇게 실행하지 않는다
+# gtr list                    ← command not found
+# gtr new branch-name         ← command not found
 ```
 
 | 결과 | 행동 |
@@ -75,6 +82,8 @@ git gtr list 2>/dev/null && echo "GTR_AVAILABLE" || echo "GTR_NOT_AVAILABLE"
 
 ### Worktree (기본)
 
+아래 명령어를 **정확히 이 순서로, 이 형태 그대로** 실행한다:
+
 ```bash
 # 1. main repo root 저장
 MAIN_REPO=$(git rev-parse --show-toplevel)
@@ -82,10 +91,12 @@ MAIN_REPO=$(git rev-parse --show-toplevel)
 # 2. 브랜치명 결정
 BRANCH_NAME="{JIRA-KEY}-{slug}"  # standalone이면 "{slug}"
 
-# 3. worktree 생성
+# 3. worktree 생성 — 반드시 "git gtr" 형태로 실행
 git gtr new "$BRANCH_NAME"
+#    ^^^
+#    "git gtr new" 이다. "gtr new"가 아니다.
 
-# 4. worktree 경로 획득 (non-porcelain 출력이 더 안정적)
+# 4. worktree 경로 획득
 WORKTREE_PATH=$(git worktree list | grep "$BRANCH_NAME" | awk '{print $1}')
 
 # 5. worktree 진입 및 검증
@@ -93,9 +104,12 @@ cd "$WORKTREE_PATH"
 [ "$(git branch --show-current)" = "$BRANCH_NAME" ] || echo "ERROR: worktree 진입 실패"
 ```
 
-- gtr hooks가 `.env` 복사 + `pnpm install`을 자동 실행
-- **반드시 worktree에 진입하고 브랜치를 검증한 후** 다음 단계 진행
-- 이후 모든 작업(plan 작성, 파일 편집)은 worktree 안에서 수행
+**자동 실행 항목** (수동 실행 불필요):
+- `.gtrconfig`의 `[copy]` 패턴에 매칭되는 `.env` 파일 복사
+- `[hooks] postCreate` 명령어 실행 (예: `pnpm install --frozen-lockfile`)
+
+**반드시 worktree에 진입하고 브랜치를 검증한 후** 다음 단계로 진행한다.
+이후 모든 작업(plan 작성, 파일 편집)은 worktree 안에서 수행한다.
 
 ### Branch (gtr 미설치 시 fallback만)
 

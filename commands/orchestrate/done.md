@@ -181,7 +181,7 @@ state JSON의 `jiraKey`가 null이면 건너뛴다.
 3. **Branch**: 브랜치명
 4. **Jira**: 이슈 상태 변경 결과 (Jira mode만)
 5. **Cleanup**: 아래 명령어 안내 (실행은 하지 않음, 사용자가 직접 결정)
-   - Worktree: `git gtr rm {BRANCH} --delete-branch --yes`
+   - Worktree: `git gtr rm {BRANCH} --delete-branch` (반드시 `git gtr`로 실행)
    - Branch: `git checkout main && git pull && git branch -d {BRANCH}`
 
 ## Done Criteria

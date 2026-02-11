@@ -70,16 +70,57 @@ cd "$WORKTREE_PATH"
 
 **Branch (only when gtr is not installed):** `git checkout -b {JIRA-KEY}-{slug}` (or `{slug}` for standalone)
 
-## 6. Write Plan (inside worktree)
+## 6. Write Plan + State (inside worktree)
 
-File: `plans/{jira-key}.md` or `plans/{slug}.md`
+Both files go in `plans/` inside the worktree directory, NOT the main repo.
 
-**IMPORTANT:** The plan file is written inside the worktree directory, NOT the main repo.
+### 6a. State JSON — `plans/{identifier}.state.json`
 
-Contents:
+**Created first.** This is the single source of truth for all agent-consumable metadata.
+
+```jsonc
+{
+  "identifier": "{jira-key}" | "{slug}",
+  "jiraKey": "{JIRA-KEY}" | null,
+  "branchName": "{branch-name}",
+
+  "worktreePath": "{absolute path to worktree}",
+  "mainRepoPath": "{absolute path to main repo}",
+  "planFile": "{absolute path to plans/{identifier}.md}",
+
+  "profile": "{profile-name}",
+  "workspace": "worktree" | "branch",
+
+  "currentPhase": "start",
+  "gates": {
+    "planConfirmed": false,
+    "expertApproved": false,
+    "prConfirmed": false
+  },
+
+  "expertReviews": {},
+
+  "verification": {
+    "lint": null,
+    "build": null,
+    "test": null,
+    "lastRunAt": null
+  },
+
+  "pullRequest": {
+    "url": null,
+    "number": null
+  },
+
+  "createdAt": "{ISO 8601 timestamp}",
+  "updatedAt": "{ISO 8601 timestamp}"
+}
+```
+
+### 6b. Plan Markdown — `plans/{identifier}.md`
+
+Human-readable plan. Contents:
 - Tracking (Jira link or branch name)
-- **Worktree: `{absolute path to worktree directory}`** ← REQUIRED for subsequent phases
-- **Main repo: `{absolute path to main repo}`** ← for reference
 - Profile used
 - Requirements summary
 - Affected layers (from `PROFILE[phases]`)
@@ -87,12 +128,28 @@ Contents:
 - Risk assessment
 - Status: "Plan ready — proceed with `/orchestrate:review`"
 
+> **Path/key metadata (worktree, Jira key, branch) lives ONLY in state JSON.** Plan markdown references state JSON for these values. Do NOT duplicate paths in plan markdown headers.
+
+### 6c. Gate 1 — Plan Confirmation
+
+After both files are written, present plan summary and ask user to confirm.
+On confirmation → update state JSON:
+```jsonc
+{
+  "gates": { "planConfirmed": true },
+  "currentPhase": "review",
+  "updatedAt": "{now}"
+}
+```
+
 ## Done Criteria
 
 - Requirements clarified
 - Worktree created and **currently inside worktree directory**
-- Plan written (inside worktree, contains `Worktree:` path)
+- `plans/{identifier}.state.json` created with all fields populated
+- `plans/{identifier}.md` written with implementation plan
 - Jira confirmed (if Jira mode)
+- Gate 1 passed (user confirmed plan)
 - Verify: `pwd` outputs worktree path, `git branch --show-current` is NOT main
 
 → Next: `/orchestrate:review`

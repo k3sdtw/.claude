@@ -7,30 +7,44 @@ description: Expert review of the plan. Context-aware agent groups (backend/fron
 Review plan with parallel expert agents selected by project context.
 Prerequisite: plan from `/orchestrate:start`.
 
-## 0. Worktree Guard (MUST run first)
+## 0. State Guard (MUST run first)
 
 ```bash
-# Read worktree path from plan
-PLAN_FILE=$(ls -t plans/*.md 2>/dev/null | head -1)
-WORKTREE_PATH=$(grep "^Worktree:" "$PLAN_FILE" | awk '{print $2}')
+# 1. Find state file
+STATE_FILE=$(ls -t plans/*.state.json 2>/dev/null | head -1)
+if [ -z "$STATE_FILE" ]; then
+  echo "ERROR: No state file found. Run /orchestrate:start first."
+  exit 1
+fi
 
-# If not in worktree, cd into it
-if [ -n "$WORKTREE_PATH" ] && [ "$(pwd)" != "$WORKTREE_PATH" ]; then
+# 2. Read from state JSON
+WORKTREE_PATH=$(python3 -c "import json; print(json.load(open('$STATE_FILE'))['worktreePath'])")
+JIRA_KEY=$(python3 -c "import json; print(json.load(open('$STATE_FILE')).get('jiraKey') or '')")
+PROFILE=$(python3 -c "import json; print(json.load(open('$STATE_FILE'))['profile'])")
+PLAN_FILE=$(python3 -c "import json; print(json.load(open('$STATE_FILE'))['planFile'])")
+
+# 3. cd into worktree if needed
+if [ "$(pwd)" != "$WORKTREE_PATH" ]; then
   cd "$WORKTREE_PATH"
 fi
 
-# Verify not on main
+# 4. Verify not on main
 if [ "$(git branch --show-current)" = "main" ]; then
-  echo "ERROR: On main branch. Must cd into worktree first."
+  echo "ERROR: On main branch. Must be in worktree."
   exit 1
 fi
 ```
 
-If `Worktree:` field is missing from plan or path doesn't exist → STOP and ask user for worktree path.
+If state file is missing or worktree path doesn't exist → STOP and ask user.
+
+Update state on entry:
+```jsonc
+{ "currentPhase": "review", "updatedAt": "{now}" }
+```
 
 ## 1. Locate Plan
 
-Read most recent `plans/*.md` or user-specified plan.
+Read plan file path from state JSON (`planFile` field). Fallback: most recent `plans/*.md`.
 
 ## 2. Select Agent Group
 
@@ -96,6 +110,29 @@ Approved: {date}
 Reviews: {Agent1} OK | {Agent2} OK | ...
 ```
 
-**GATE: Ask user confirmation before proceeding.**
+Update state JSON:
+```jsonc
+{
+  "expertReviews": {
+    "architect": "approved",
+    "security-reviewer": "approved"
+    // ... each agent's result
+  },
+  "updatedAt": "{now}"
+}
+```
+
+## GATE 2: Expert Approval
+
+**STOP.** Ask user confirmation before proceeding.
+
+On confirmation → update state JSON:
+```jsonc
+{
+  "gates": { "expertApproved": true },
+  "currentPhase": "impl",
+  "updatedAt": "{now}"
+}
+```
 
 → Next: `/orchestrate:impl`

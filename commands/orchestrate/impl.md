@@ -6,30 +6,45 @@ description: Implement with parallel agents. Plan-based Domain/Infra/App layer d
 
 Implement approved plan using parallel agents. Prerequisite: plan approved via `/orchestrate:review`.
 
-## 0. Worktree Guard (MUST run first)
+## 0. State Guard (MUST run first)
 
 ```bash
-# Find plan and extract worktree path
-PLAN_FILE=$(ls -t plans/*.md 2>/dev/null | head -1)
-WORKTREE_PATH=$(grep "^Worktree:" "$PLAN_FILE" | awk '{print $2}')
+# 1. Find state file
+STATE_FILE=$(ls -t plans/*.state.json 2>/dev/null | head -1)
+if [ -z "$STATE_FILE" ]; then
+  echo "ERROR: No state file found. Run /orchestrate:start first."
+  exit 1
+fi
 
-# If not in worktree, cd into it
-if [ -n "$WORKTREE_PATH" ] && [ "$(pwd)" != "$WORKTREE_PATH" ]; then
+# 2. Read from state JSON
+WORKTREE_PATH=$(python3 -c "import json; print(json.load(open('$STATE_FILE'))['worktreePath'])")
+JIRA_KEY=$(python3 -c "import json; print(json.load(open('$STATE_FILE')).get('jiraKey') or '')")
+PROFILE=$(python3 -c "import json; print(json.load(open('$STATE_FILE'))['profile'])")
+PLAN_FILE=$(python3 -c "import json; print(json.load(open('$STATE_FILE'))['planFile'])")
+BRANCH=$(python3 -c "import json; print(json.load(open('$STATE_FILE'))['branchName'])")
+
+# 3. cd into worktree if needed
+if [ "$(pwd)" != "$WORKTREE_PATH" ]; then
   cd "$WORKTREE_PATH"
 fi
 
-# Verify not on main
+# 4. Verify not on main
 if [ "$(git branch --show-current)" = "main" ]; then
-  echo "ERROR: On main branch. Must cd into worktree first."
+  echo "ERROR: On main branch. Must be in worktree."
   exit 1
 fi
 ```
 
-If `Worktree:` field is missing from plan or path doesn't exist → STOP and ask user for worktree path.
+If state file is missing or worktree path doesn't exist → STOP and ask user.
+
+Update state on entry:
+```jsonc
+{ "currentPhase": "impl", "updatedAt": "{now}" }
+```
 
 ## 1. Load Plan
 
-Get branch name (`git branch --show-current`), read `plans/{identifier}.md`, extract agent assignments from "Parallel Agent Assignment" section.
+Read plan from `planFile` path in state JSON. Extract agent assignments from "Parallel Agent Assignment" section.
 
 ## 2. Execute by Phase (from plan)
 
@@ -55,10 +70,27 @@ After all agents complete:
 
 Build/test failure → fix and re-verify (max 3 attempts). Use `build-error-resolver` agent if needed.
 
+## 4. Update State
+
+After verification passes, update state JSON:
+```jsonc
+{
+  "verification": {
+    "lint": "pass" | "fail",
+    "build": "pass" | "fail",
+    "test": "pass" | "fail",
+    "lastRunAt": "{ISO 8601 timestamp}"
+  },
+  "currentPhase": "done",
+  "updatedAt": "{now}"
+}
+```
+
 ## Done Criteria
 
 - All agents completed
 - Build passes
 - Tests pass
+- State JSON updated with verification results
 
 → Next: `/orchestrate:done`

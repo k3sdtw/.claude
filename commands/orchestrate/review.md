@@ -145,4 +145,5 @@ state JSON을 Read → 아래 필드 갱신 → Write:
 - [ ] state JSON의 expertReviews 필드에 각 에이전트 결과 기록
 - [ ] Gate 2 통과 (사용자 확인)
 
-→ 다음: `/orchestrate:impl`
+> `/orchestrate`로 실행 중이면 자동으로 impl phase로 진행한다.
+> 단독 실행(`/orchestrate:review`)이면 사용자에게 안내: `/orchestrate:impl`

@@ -120,4 +120,5 @@ verification 완료 후 state JSON을 Read → 아래 필드 갱신 → Write:
 - [ ] state JSON의 verification 필드에 결과 기록
 - [ ] currentPhase가 "done"으로 갱신됨
 
-→ 다음: `/orchestrate:done`
+> `/orchestrate`로 실행 중이면 자동으로 done phase로 진행한다.
+> 단독 실행(`/orchestrate:impl`)이면 사용자에게 안내: `/orchestrate:done`

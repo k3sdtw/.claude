@@ -257,4 +257,5 @@ git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/ori
 - [ ] Gate 1 통과 (사용자가 플랜 확인)
 - [ ] 검증: `pwd` = worktree 경로, `git branch --show-current` ≠ main
 
-→ 다음: `/orchestrate:review`
+> `/orchestrate`로 실행 중이면 자동으로 review phase로 진행한다.
+> 단독 실행(`/orchestrate:start`)이면 사용자에게 안내: `/orchestrate:review`

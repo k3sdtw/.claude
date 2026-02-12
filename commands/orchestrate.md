@@ -139,32 +139,55 @@ WRONG:    gtr new <branch>        ← command not found
 - `/orchestrate:start` 재실행 시: 동일 identifier의 state.json이 이미 존재하면 → "기존 워크플로우를 이어서 진행할지, 새로 시작할지" AskUserQuestion으로 확인
 - 이미 완료된 phase를 다시 실행하면: state의 currentPhase를 확인하고 → "이미 {phase}가 완료되었습니다. 다시 실행할까요?" 확인
 
-## Pipeline Flow
+## Pipeline Flow (자동 연속 실행)
+
+`/orchestrate` 실행 시 4개 phase를 **하나의 세션에서 자동으로 연속 실행**한다.
+사용자가 개별 sub-command를 입력할 필요 없다. Gate 확인만 하면 자동으로 다음 phase로 진행한다.
 
 ```
 [Project Context] → automatic (CLAUDE.md 기반)
      ↓
 [Phase 1: Start]   → create worktree → extract context → write state.json + plan.md → GATE 1
-     ↓
+     ↓ (Gate 1 통과 시 자동 진행)
 [Phase 2: Review]  → State Guard → parallel expert review → GATE 2
-     ↓
+     ↓ (Gate 2 통과 시 자동 진행)
 [Phase 3: Impl]    → State Guard → parallel agent implementation → verification
-     ↓
-[Phase 4: Done]    → State Guard → verify → code review → commit → PR → GATE 3
+     ↓ (verification 통과 시 자동 진행)
+[Phase 4: Done]    → State Guard → verify → code review → commit → GATE 3 → PR
 ```
 
-각 phase는 sub-command에 매핑된다. Gate는 사용자의 명시적 확인이 필요하다.
+### Phase 실행 방법
 
-## Resuming Mid-Workflow
+각 phase의 상세 지침은 sub-command 파일에 정의되어 있다.
+**Read 도구로 해당 파일을 읽고, 그 안의 지침을 그대로 수행한다.**
+
+| 순서 | 파일 | 진입 조건 |
+|------|------|-----------|
+| 1 | `~/.claude/commands/orchestrate/start.md` | 즉시 시작 |
+| 2 | `~/.claude/commands/orchestrate/review.md` | Gate 1 통과 (planConfirmed = true) |
+| 3 | `~/.claude/commands/orchestrate/impl.md` | Gate 2 통과 (expertApproved = true) |
+| 4 | `~/.claude/commands/orchestrate/done.md` | impl verification 통과 |
+
+### 자동 진행 규칙
+
+1. 각 phase 파일의 지침을 **끝까지** 수행한다
+2. Gate에서 사용자 확인을 받으면 **즉시 다음 phase 파일을 Read하여 실행**한다
+3. sub-command 파일 끝의 `→ 다음: /orchestrate:xxx` 안내는 **무시**한다 — 자동으로 진행한다
+4. 어떤 phase에서든 STOP이 발생하면 전체 워크플로우를 중단하고 사용자에게 보고한다
+
+## Resuming Mid-Workflow (개별 sub-command)
+
+세션이 끊기거나 중간부터 재개할 때는 개별 sub-command를 직접 실행한다:
 
 ```
-/orchestrate:start   → Phase 1 (state.json 생성)
-/orchestrate:review  → Phase 2 (state.json 읽기)
-/orchestrate:impl    → Phase 3 (state.json 읽기)
-/orchestrate:done    → Phase 4 (state.json 읽기)
+/orchestrate:start   → Phase 1부터 시작
+/orchestrate:review  → Phase 2부터 재개
+/orchestrate:impl    → Phase 3부터 재개
+/orchestrate:done    → Phase 4부터 재개
 ```
 
-모든 재개 컨텍스트(projectType, techStack, commands, worktree path, Jira key, gate 상태)는 state JSON에서 로드한다.
+개별 sub-command 실행 시에는 해당 phase만 수행하고 종료한다 (자동 연속 실행 아님).
+모든 재개 컨텍스트는 state JSON에서 로드한다.
 
 ## Output Language
 

@@ -6,7 +6,8 @@
 			"Edit(**)",
 			"Read(**)",
 			"Write(**)",
-			"Search(**)"
+			"Search(**)",
+			"mcp__filesystem__read_multiple_files"
 		],
 		"deny": ["Bash(git reset*)", "Bash(git rebase*)", "Bash(rm -rf *)"]
 	},
@@ -41,6 +42,17 @@
 					{
 						"type": "command",
 						"command": "~/.claude/skills/continuous-learning-v2/hooks/observe.sh post"
+					}
+				]
+			}
+		],
+		"Notification": [
+			{
+				"matcher": "",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "osascript -e 'display notification \"Claude가 입력을 기다리고 있습니다\" with title \"Claude Code\" sound name \"Ping\"'"
 					}
 				]
 			}

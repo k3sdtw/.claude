@@ -183,6 +183,12 @@ Write 도구로 아래 JSON을 생성한다 (모든 필드를 채울 것):
 
   "expertReviews": {},
 
+  "testDatabase": {
+    "name": null,                   // 테스트 전용 DB 이름 (impl/done에서 생성)
+    "url": null,                    // 치환된 DATABASE_URL
+    "type": null                    // postgresql | mysql | sqlite | mongodb
+  },
+
   "verification": {
     "lint": null,
     "build": null,

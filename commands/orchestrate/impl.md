@@ -79,7 +79,10 @@ state JSON의 `planFile` 경로를 Read 도구로 읽는다.
 
 1. **Lint**: `commands.lint` 값을 Bash로 실행 (예: `pnpm lint`)
 2. **Build**: `commands.build` 값을 Bash로 실행 (예: `pnpm build`)
-3. **Test**: `commands.test` 값을 Bash로 실행 (예: `pnpm test:e2e`)
+3. **Test DB 준비**: `rules/common/test-db-isolation.md` 프로토콜의 1~6단계를 수행한다.
+   - state.json에 `testDatabase` 필드가 이미 있으면 기존 DB 재사용
+   - 없으면 감지 → 생성 → 마이그레이션 → state 기록
+4. **Test**: `DATABASE_URL="{testDatabase.url}" {commands.test}` 형태로 실행
 
 > state JSON에 commands 값이 없는 경우 → AskUserQuestion으로 사용자에게 명령어를 직접 질문
 

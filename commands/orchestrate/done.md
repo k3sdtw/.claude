@@ -22,13 +22,17 @@ Prerequisite: `/orchestrate:impl`에서 구현 완료.
 
 ## 1. Verification Loop (최대 3회)
 
-state JSON의 `commands` 필드에 저장된 명령어를 순서대로 실행한다:
+state JSON의 `commands` 필드에 저장된 명령어를 순서대로 실행한다.
+
+**테스트 DB 격리:** `rules/common/test-db-isolation.md` 프로토콜을 따른다.
+state.json에 `testDatabase` 필드가 이미 있으면 기존 DB를 재사용한다.
+없으면 프로토콜의 1~6단계를 수행한 후 테스트를 실행한다.
 
 ```
 각 iteration:
   1. Lint:  commands.lint 값을 Bash로 실행
   2. Build: commands.build 값을 Bash로 실행 → 실패 시 수정 후 iteration 재시작
-  3. Test:  commands.test 값을 Bash로 실행 → 실패 시 수정 후 iteration 재시작
+  3. Test:  DATABASE_URL="{testDatabase.url}" {commands.test} 실행 → 실패 시 수정 후 iteration 재시작
   4. 모두 통과 → 루프 종료
 ```
 
@@ -157,7 +161,24 @@ PR 생성 후 → state JSON을 Read → 아래 필드 갱신 → Write:
 }
 ```
 
-## 5. Update Jira (Jira mode만)
+## 5. Test DB Cleanup
+
+state.json의 `testDatabase` 필드가 존재하면 `rules/common/test-db-isolation.md`의 Cleanup 절차를 수행한다.
+
+`testDatabase.type`에 따라 해당 drop 명령어를 실행한다:
+
+| type | 명령어 |
+|------|--------|
+| postgresql | `dropdb "{testDatabase.name}" 2>/dev/null \|\| true` |
+| mysql | `mysql -u root -e "DROP DATABASE IF EXISTS \`{testDatabase.name}\`;" 2>/dev/null \|\| true` |
+| sqlite | `rm -f "{SQLite 파일 경로}" 2>/dev/null \|\| true` |
+| mongodb | `mongosh --eval "db.getSiblingDB('{testDatabase.name}').dropDatabase()" 2>/dev/null \|\| true` |
+
+실행 후 state.json의 `testDatabase`를 `null`로 갱신한다.
+
+> cleanup 실패 시 에러를 무시하고 진행한다. Output에서 결과(성공/실패)를 보고한다.
+
+## 6. Update Jira (Jira mode만)
 
 state JSON의 `jiraKey`가 null이면 건너뛴다.
 
@@ -172,15 +193,16 @@ state JSON의 `jiraKey`가 null이면 건너뛴다.
    mcp__jira__jira_transition_issue({ issue_key: "{JIRA_KEY}", transition: "{선택된 transition}" })
 ```
 
-## 6. Output
+## 7. Output
 
 사용자에게 아래 결과를 보고한다:
 
 1. **Verification**: lint/build/test 각 결과
 2. **PR**: URL + 제목
 3. **Branch**: 브랜치명
-4. **Jira**: 이슈 상태 변경 결과 (Jira mode만)
-5. **Cleanup**: 아래 명령어 안내 (실행은 하지 않음, 사용자가 직접 결정)
+4. **Test DB Cleanup**: 삭제한 DB 이름 + 결과 (성공/실패)
+5. **Jira**: 이슈 상태 변경 결과 (Jira mode만)
+6. **Cleanup**: 아래 명령어 안내 (실행은 하지 않음, 사용자가 직접 결정)
    - Worktree: `git gtr rm {BRANCH} --delete-branch` (반드시 `git gtr`로 실행)
    - Branch: `git checkout main && git pull && git branch -d {BRANCH}`
 
@@ -192,4 +214,5 @@ state JSON의 `jiraKey`가 null이면 건너뛴다.
 - [ ] Gate 3 통과 (사용자 확인)
 - [ ] PR 생성 완료, URL 보고
 - [ ] state JSON의 pullRequest 필드 갱신, currentPhase = "completed"
+- [ ] 테스트 DB 자동 삭제 완료, state의 testDatabase = null
 - [ ] Jira 상태 변경 완료 (Jira mode인 경우)

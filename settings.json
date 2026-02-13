@@ -48,11 +48,38 @@
 		],
 		"Notification": [
 			{
-				"matcher": "",
+				"matcher": "permission_prompt",
 				"hooks": [
 					{
 						"type": "command",
-						"command": "osascript -e 'display notification \"Claude가 입력을 기다리고 있습니다\" with title \"Claude Code\" sound name \"Ping\"'"
+						"command": "~/.claude/hooks/notify-permission-prompt.sh"
+					}
+				]
+			},
+			{
+				"matcher": "idle_prompt",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "~/.claude/hooks/notify-idle-prompt.sh"
+					}
+				]
+			},
+			{
+				"matcher": "auth_success",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "~/.claude/hooks/notify-auth-success.sh"
+					}
+				]
+			},
+			{
+				"matcher": "elicitation_dialog",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "~/.claude/hooks/notify-elicitation-dialog.sh"
 					}
 				]
 			}

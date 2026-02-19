@@ -1,92 +1,97 @@
 {
-	"permissions": {
-		"allow": [
-			"Bash",
-			"Read",
-			"Edit(**)",
-			"Read(**)",
-			"Write(**)",
-			"Search(**)",
-			"mcp__filesystem__read_multiple_files"
-		],
-		"deny": ["Bash(git reset*)", "Bash(git rebase*)", "Bash(rm -rf *)"]
-	},
-	"hooks": {
-		"SessionStart": [
-			{
-				"matcher": "startup|resume|clear|compact",
-				"hooks": [
-					{
-						"type": "command",
-						"command": "${CLAUDE_PLUGIN_ROOT}/hooks/session-start.sh",
-						"async": true
-					}
-				]
-			}
-		],
-		"PreToolUse": [
-			{
-				"matcher": "*",
-				"hooks": [
-					{
-						"type": "command",
-						"command": "~/.claude/skills/continuous-learning-v2/hooks/observe.sh pre"
-					}
-				]
-			}
-		],
-		"PostToolUse": [
-			{
-				"matcher": "*",
-				"hooks": [
-					{
-						"type": "command",
-						"command": "~/.claude/skills/continuous-learning-v2/hooks/observe.sh post"
-					}
-				]
-			}
-		],
-		"Notification": [
-			{
-				"matcher": "permission_prompt",
-				"hooks": [
-					{
-						"type": "command",
-						"command": "~/.claude/hooks/notify-permission-prompt.sh"
-					}
-				]
-			},
-			{
-				"matcher": "idle_prompt",
-				"hooks": [
-					{
-						"type": "command",
-						"command": "~/.claude/hooks/notify-idle-prompt.sh"
-					}
-				]
-			},
-			{
-				"matcher": "auth_success",
-				"hooks": [
-					{
-						"type": "command",
-						"command": "~/.claude/hooks/notify-auth-success.sh"
-					}
-				]
-			},
-			{
-				"matcher": "elicitation_dialog",
-				"hooks": [
-					{
-						"type": "command",
-						"command": "~/.claude/hooks/notify-elicitation-dialog.sh"
-					}
-				]
-			}
-		]
-	},
-	"statusLine": {
-		"type": "command",
-		"command": "~/.claude/cc-chips/engine.sh"
-	}
+  "permissions": {
+    "allow": [
+      "Bash",
+      "Read",
+      "Edit(**)",
+      "Read(**)",
+      "Write(**)",
+      "Search(**)",
+      "mcp__filesystem__read_multiple_files"
+    ],
+    "deny": [
+      "Bash(git reset*)",
+      "Bash(git rebase*)",
+      "Bash(rm -rf *)"
+    ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/session-start.sh",
+            "async": true
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/skills/continuous-learning-v2/hooks/observe.sh pre"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/skills/continuous-learning-v2/hooks/observe.sh post"
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "matcher": "permission_prompt",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/notify-permission-prompt.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "idle_prompt",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/notify-idle-prompt.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "auth_success",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/notify-auth-success.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "elicitation_dialog",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/notify-elicitation-dialog.sh"
+          }
+        ]
+      }
+    ]
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "~/.claude/cc-chips/engine.sh"
+  },
+  "skipDangerousModePermissionPrompt": true
 }

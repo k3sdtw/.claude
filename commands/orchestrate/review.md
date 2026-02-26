@@ -52,12 +52,30 @@ state JSON의 `planFile` 경로를 Read 도구로 읽어 플랜 내용을 확보
 
 ### FRONTEND_GROUP (4 agents)
 
-| # | Agent (subagent_type) | Review Focus |
-|---|----------------------|-------------|
-| 1 | `architect` | 컴포넌트 구조, 상태 관리, 라우팅, 코드 스플리팅, 모듈 경계 |
-| 2 | `ux-reviewer` | 접근성(a11y), 반응형, 로딩/에러/빈 상태, 인터랙션 패턴 |
-| 3 | `security-reviewer` | XSS, CSP, 토큰 저장, CORS, 서드파티 스크립트, 클라이언트 민감 데이터 |
-| 4 | `performance-reviewer` | 번들 사이즈, 렌더링 최적화, lazy loading, 요청 워터폴, 메모리 누수 |
+| # | Agent (subagent_type) | Review Focus | React Skill 적용 |
+|---|----------------------|-------------|:-:|
+| 1 | `architect` | 컴포넌트 구조, 상태 관리, 라우팅, 코드 스플리팅, 모듈 경계 | O |
+| 2 | `ux-reviewer` | 접근성(a11y), 반응형, 로딩/에러/빈 상태, 인터랙션 패턴 | O |
+| 3 | `security-reviewer` | XSS, CSP, 토큰 저장, CORS, 서드파티 스크립트, 클라이언트 민감 데이터 | - |
+| 4 | `performance-reviewer` | 번들 사이즈, 렌더링 최적화, lazy loading, 요청 워터폴, 메모리 누수 | O |
+
+#### React Skill 연동 (vercel-react-best-practices)
+
+FRONTEND_GROUP 또는 FULLSTACK_GROUP에서 **React/Next.js 프로젝트**를 리뷰할 때, 위 테이블에서 "React Skill 적용 = O"인 에이전트는 `vercel-react-best-practices` 스킬의 규칙 파일을 **반드시** 참조해야 한다.
+
+**React 프로젝트 감지 조건** (하나라도 해당):
+- techStack에 `react`, `next`, `nextjs` 포함
+- `next.config.*`, `app/layout.tsx`, `package.json`에 `react` 의존성 존재
+
+**에이전트별 참조 규칙 파일:**
+
+| Agent | 참조할 규칙 카테고리 (prefix) | 스킬 경로 |
+|-------|---------------------------|----------|
+| `architect` | `async-*`, `bundle-*`, `server-*` | `~/.claude/skills/vercel-react-best-practices/rules/` |
+| `ux-reviewer` | `rendering-*`, `rerender-*`, `client-*` | 동일 |
+| `performance-reviewer` | **전체 규칙** (8개 카테고리 모두) | 동일 |
+
+> `security-reviewer`는 보안 관점에 집중하므로 React 성능 규칙을 적용하지 않는다.
 
 ### FULLSTACK_GROUP (6 agents)
 
@@ -83,6 +101,7 @@ ux-reviewer는 프론트엔드 관점의 리뷰 포커스를 그대로 유지한
 2. 아래 관점에서 플랜을 리뷰하세요:
    {해당 에이전트의 Review Focus — 위 테이블에서 복사}
 3. 프로젝트 소스코드를 탐색하여 기존 패턴·규칙과의 일관성을 확인하세요.
+{REACT_SKILL_BLOCK}
 
 ## 출력 형식
 발견사항을 아래 형식으로 보고하세요. 문제가 없으면 "No concerns"만 출력.
@@ -91,6 +110,24 @@ ux-reviewer는 프론트엔드 관점의 리뷰 포커스를 그대로 유지한
 - [HIGH] {발견} → {권고}
 - [MEDIUM] {발견} → {권고}
 - [LOW] {발견} → {권고}
+```
+
+**조건부 삽입: `{REACT_SKILL_BLOCK}`**
+
+React 프로젝트(Section 3 감지 조건 참조)이고 해당 에이전트가 "React Skill 적용 = O"인 경우에만, `{REACT_SKILL_BLOCK}` 위치에 아래를 삽입한다. 그 외에는 빈 문자열로 치환:
+
+```
+4. React/Next.js 성능 best practice 관점에서 추가 리뷰하세요.
+   아래 스킬의 규칙 파일들을 Read 도구로 읽고, 플랜이 이 규칙을 위반하거나 놓치고 있는지 검토하세요.
+
+   ### 참조 규칙 (vercel-react-best-practices)
+   - 스킬 경로: ~/.claude/skills/vercel-react-best-practices/
+   - 먼저 SKILL.md를 읽어 전체 규칙 목록을 파악하세요.
+   - 그 다음 아래 카테고리의 규칙 파일들을 rules/ 디렉토리에서 읽으세요:
+     {에이전트별 참조 규칙 카테고리 — Section 3 테이블 참조}
+
+   규칙 위반 발견 시 해당 규칙 ID를 severity 태그와 함께 명시하세요. 예:
+   - [HIGH] async-parallel 위반: 독립적인 fetch가 순차 실행됨 → Promise.all()로 병렬화 권고
 ```
 
 ## 5. Aggregate & Fix (최대 2회)

@@ -2,6 +2,10 @@
 
 You are a senior prompt engineer and software architect. Perform a comprehensive analysis of this codebase and build the entire `.claude/` directory so that Claude Code can operate at peak performance within this project.
 
+**Mode**: If $ARGUMENTS contains "full", generate everything. Otherwise default to "minimal" (core files only, skills/agents/commands generated on-demand later).
+
+ultrathink
+
 ---
 
 ## Phase 0: Monorepo Detection (MUST run first)
@@ -78,90 +82,95 @@ Store the Package Registry and topology — all subsequent phases reference it.
 
 ---
 
-## Phase 1: Deep Codebase Analysis
+## Phase 1: Codebase Analysis
 
-Run **parallel Explore subagents** for each analysis. In a monorepo, certain analyses must be performed **per-package** while others are repo-wide.
+Analysis is split into priority tiers. In minimal mode, run only Tier 1. In full mode, run all tiers.
 
-### Repo-wide analyses (run once)
+**CRITICAL**: For every pattern detected, extract 1-2 ACTUAL code snippets from this codebase. These will be used verbatim in generated files. Do NOT write generic examples — use only code that exists in this project.
 
-**Analysis 1: Root metadata & tooling**
+### Tier 1: REQUIRED (always run, both modes)
+
+Run these as **parallel Explore subagents**. In a monorepo, repo-wide analyses run once; per-package analyses run for EACH package.
+
+**Analysis 1: Root metadata & tooling** (repo-wide)
 - Root manifest (scripts, workspaces config)
 - Monorepo orchestrator config (Turbo tasks, Nx targets, Lerna config)
 - Shared linter/formatter configs at root level
-- Root-level CI/CD pipelines (`.github/workflows/`, etc.)
-- Docker Compose, K8s manifests, infra-as-code
+- Package manager + version (npm/pnpm/yarn/bun + lockfile)
+- Detect the default branch: `git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null || echo "main"`
 
-**Analysis 2: Git history & workflow**
-- `git log --oneline -50` — commit message convention
-- `git branch -a` — branch naming patterns
+**Analysis 2: Tech stack & architecture** (per-package in monorepo, else repo-wide)
+For each package/project, detect:
+- Framework (Next.js, Fastify, Django, etc.) + version
+- Architecture pattern (layered, modular, MVC, etc.)
+- Directory structure (2-3 depth, from actual `find` or `ls`)
+- Entry points
+- Package-specific linter overrides
+- Import alias patterns (`@/`, `~/`, `#` etc.)
+
+**Analysis 3: Commands & scripts** (per-package + root)
+- Dev, build, test, lint commands (VERIFY each by checking they exist in scripts)
+- Migration commands, seed commands
+- Deployment scripts
+- For monorepos: per-package commands AND root pipeline commands
+
+**Analysis 4: Risk & security patterns** (repo-wide + per-package)
+- Sensitive file paths: `.env`, `.env.*`, `**/secrets/**`, credentials, API keys
+- Dangerous scripts in package.json: `drop`, `reset`, `destroy`, `nuke`, `clean:all`
+- Production URLs/endpoints in config files
+- Database connection strings
+- Files that should NEVER be edited by the agent
+- Default branch name (for branch protection hook)
+
+### Tier 2: RECOMMENDED (run in full mode, skip in minimal)
+
+**Analysis 5: Git history & workflow** (repo-wide)
+- `git log --oneline -30` — commit message convention (detect: conventional commits, gitmoji, etc.)
+- `git branch -a | head -20` — branch naming patterns
 - PR templates, CODEOWNERS
 - `.gitignore` patterns
 
-**Analysis 3: Environment & secrets**
-- `.env.example`, `.env.*` patterns at root and per-package
-- Docker configs
-- Secret management hints
+**Analysis 6: Code style & naming** (per-package)
+- Naming patterns: files, functions, variables, components
+- Export patterns (named vs default, barrel files)
+- Comment style and density
+- Actual code examples for each detected pattern
 
-**Analysis 4: Shared code & cross-cutting concerns**
-- Shared packages/libraries that multiple apps import
-- Shared types/interfaces/schemas
-- Shared configs (ESLint presets, TS configs, test utils)
-- Shared CI/CD steps or reusable workflows
-
-### Per-package analyses (run for EACH package in registry)
-
-**Analysis 5: Package tech stack & architecture** (per package)
-For each package, detect:
-- Framework (Next.js, Fastify, Django, etc.)
-- Architecture pattern (layered, modular, MVC, etc.)
-- Directory structure (2-3 depth)
-- Entry points
-
-**Analysis 6: Package code style** (per package)
-- Package-specific linter overrides (many monorepos have per-package eslint configs)
-- Naming patterns specific to this package
-- Import alias patterns (may differ: `@/` in one app, `~/` in another)
-- Export patterns
-
-**Analysis 7: Package testing patterns** (per package)
-- Test framework (may differ per package)
-- Test file locations
-- Mocking patterns
+**Analysis 7: Testing patterns** (per-package)
+- Test framework (Vitest, Jest, Playwright, pytest, etc.)
+- Test file locations and naming conventions
+- Mocking/stubbing patterns
+- Fixture patterns
 - Coverage config
 
-**Analysis 8: Package API / interface patterns** (per package, if applicable)
-- Routes, endpoints, schemas
-- Auth patterns
-- Error handling
+### Tier 3: EXTENDED (run in full mode only, AND only if relevant stack detected)
 
-**Analysis 9: Package data models** (per package, if applicable)
-- ORM schemas, migrations
+**Analysis 8: API / interface patterns** (if API code exists)
+- Routes, endpoints, schema definitions
+- Auth/authz patterns
+- Error handling patterns, error response shape
+- Validation patterns
+
+**Analysis 9: Data models** (if ORM/DB code exists)
+- ORM schemas, migration structure
 - Entity relationships
+- Query patterns
 
-**Analysis 10: Documentation & comments** (repo-wide)
-- README structure at root and per-package
+**Analysis 10: Documentation & ADRs** (repo-wide)
+- README structure
 - ADRs, CONTRIBUTING, CHANGELOG
+- Inline doc conventions (JSDoc, docstrings, etc.)
 
 ---
 
 ## Phase 2: Synthesize & Plan
 
-Consolidate all results into two distinct categories:
+Consolidate all results into two distinct categories.
 
-### 2.1 Repo-wide conventions (goes in root CLAUDE.md + root rules/)
-- Conventions that apply everywhere (commit messages, branch naming, shared lint rules)
-- Cross-package workflow (how to add a new package, how to handle shared types)
-- Root-level commands (turbo/nx pipelines)
-
-### 2.2 Per-package conventions (goes in each package's CLAUDE.md)
-- Package-specific tech stack, architecture, commands
-- Package-specific conventions that differ from root
-- Package-specific gotchas
-
-### 2.3 Decide what goes where
+### 2.1 What goes where
 
 ```
-CLAUDE.md LOADING MECHANICS (critical for monorepo design):
+CLAUDE.md LOADING MECHANICS:
 
 1. STARTUP: Claude walks UPWARD from CWD → root, loads all CLAUDE.md files found
 2. LAZY LOAD: Subdirectory CLAUDE.md files load ONLY when Claude accesses files there
@@ -169,139 +178,172 @@ CLAUDE.md LOADING MECHANICS (critical for monorepo design):
 4. .claude/ IS ROOT-ONLY: settings.json, skills, agents, commands live at repo root
 
 Therefore:
-- Root CLAUDE.md   → universal conventions, repo-wide commands, package registry
-- {pkg}/CLAUDE.md  → package-specific stack, commands, patterns, gotchas
-- Root .claude/     → all skills, agents, commands, settings (shared across packages)
-- Skills            → must be package-aware (reference specific package paths)
-- Agents            → must accept package context in their workflow
-- Commands          → must detect or accept which package they're operating on
+- Root CLAUDE.md   → HARD LIMIT 200 lines. Table of contents, not encyclopedia.
+                     Package registry, dependency graph, root commands, pointers to rules/.
+- {pkg}/CLAUDE.md  → HARD LIMIT 150 lines per file. Package-specific only.
+                     Never repeat what root CLAUDE.md says.
+- .claude/rules/   → Detailed conventions, separated by concern.
+- .claude/skills/  → Package-aware workflows (full mode only).
+- .claude/agents/  → Package-context-aware subagents (full mode only).
+- .claude/commands/ → Package-detecting commands (full mode only).
+```
+
+### 2.2 Danger map
+
+From Analysis 4, build the complete danger map:
+```
+DENY LIST (for settings.json):
+  Read:  [list of sensitive file paths]
+  Write: [list of files that should never be edited]
+
+HOOK BLOCKS (for PreToolUse):
+  Bash:  [dangerous commands detected from scripts]
+  Edit:  [branch protection, protected files]
+
+STOP HOOKS:
+  Session end: auto-update claude-progress.txt
 ```
 
 ---
 
 ## Phase 3: Generate Files
 
+### --- CORE FILES (both minimal and full mode) ---
+
 ### 3.1 Root CLAUDE.md
+
+**HARD LIMIT: 200 lines. This is a table of contents, not a manual.**
 
 ```markdown
 # [Project Name]
 
 ## Overview
-[1-2 lines. What this monorepo contains + orchestrator tool]
-
-## Monorepo Structure
-[Topology type]. Managed by [Turbo/Nx/Lerna/pnpm workspaces].
-
-| Package | Path | Type | Stack | Description |
-|---------|------|------|-------|-------------|
-| @repo/web | apps/web | app | Next.js 14 | Main web application |
-| @repo/api | apps/api | service | Fastify | REST API server |
-| @repo/shared | packages/shared | library | TypeScript | Shared types & utils |
-| ... | ... | ... | ... | ... |
-
-## Dependency Graph
-@repo/web → @repo/ui, @repo/shared
-@repo/api → @repo/db, @repo/shared
-
-## Root Commands
-- `[pkg-mgr] dev` — Start all apps in dev mode
-- `[pkg-mgr] build` — Build all packages (topological order)
-- `[pkg-mgr] test` — Run all tests across packages
-- `[pkg-mgr] lint` — Lint entire monorepo
-
-## Per-Package Commands
-| Package | Dev | Test | Build |
-|---------|-----|------|-------|
-| @repo/web | `[cmd]` | `[cmd]` | `[cmd]` |
-| @repo/api | `[cmd]` | `[cmd]` | `[cmd]` |
-| ... | ... | ... | ... |
-
-## Cross-Package Workflow
-- When modifying shared types in `packages/shared/`, check all dependents: [list]
-- After changing `packages/db/` schema, run migrations then rebuild dependents
-- Shared ESLint config lives at `packages/config-eslint/` — changes affect all packages
-
-## Repo-Wide Conventions
-[Only conventions that genuinely apply everywhere]
-
-## Hard Rules
-- Never modify files across multiple packages in a single uncommitted change
-  without verifying cross-package type compatibility
-- Run `[typecheck command]` after cross-package changes
-- [Actual sensitive file paths to deny]
-```
-
-**Critical rules for root CLAUDE.md in monorepos:**
-- Include the Package Registry table — Claude needs this map to navigate
-- Include the dependency graph — Claude must know impact scope of changes
-- Cross-package commands table — Claude needs to know how to run things per-package
-- Keep package-specific details OUT — those go in per-package CLAUDE.md files
-- Under 500 lines
-
-### 3.2 Per-Package CLAUDE.md files
-
-For **each package** in the registry, generate `{package-path}/CLAUDE.md`:
-
-```markdown
-# [Package Name]
-
-## Overview
-[What this package does. Its role in the monorepo]
+[1-2 lines. What this project/monorepo does]
 
 ## Tech Stack
-[Package-specific stack — may differ from other packages]
+[Key technologies, versions — one line each]
 
-## Commands (run from this directory)
+## [IF MONOREPO] Package Registry
+| Package | Path | Type | Stack |
+|---------|------|------|-------|
+| ... | ... | ... | ... |
+
+## [IF MONOREPO] Dependency Graph
+[package] → [dependency], [dependency]
+
+## Commands
+[Only the most essential commands, verified working]
 - `[cmd]` — dev
 - `[cmd]` — test
 - `[cmd]` — build
 - `[cmd]` — lint
 
-## Directory Structure
-[This package's internal structure, 2-3 depth]
+## [IF MONOREPO] Per-Package Commands
+| Package | Dev | Test | Build |
+|---------|-----|------|-------|
+| ... | ... | ... | ... |
 
-## Architecture
-[Package-specific architecture pattern and layers]
+## Key Rules
+- [3-5 most critical project-specific rules only]
+- [No generic advice like "write clean code"]
 
-## Key Patterns
-[Code patterns specific to THIS package, with actual code examples]
+## Hard Stops
+- [Things the agent must NEVER do in this specific project]
 
-## Internal Dependencies
-- Imports from `@repo/shared`: [what it uses]
-- Imports from `@repo/ui`: [what it uses]
+## Detailed Conventions → .claude/rules/
+- Code style: .claude/rules/code-style.md
+- Architecture: .claude/rules/architecture.md
+- Testing: .claude/rules/testing.md
+- Git workflow: .claude/rules/git-workflow.md
+[IF MONOREPO]:
+- Monorepo workflow: .claude/rules/monorepo-workflow.md
 
-## Gotchas
-[Package-specific traps and caveats]
+## [IF MONOREPO] Cross-Package Workflow
+- When modifying shared types in `[path]`, check dependents: [list]
+- After schema changes in `[path]`, run migrations then rebuild
+- Shared config at `[path]` — changes affect all packages
 ```
 
-**Per-package CLAUDE.md rules:**
-- Under 200 lines each — these lazy-load, so they must be focused
-- Only include info that DIFFERS from or EXTENDS the root CLAUDE.md
-- Never repeat root-level conventions (Claude already has those from upward loading)
-- Always state what shared packages this package depends on and what it imports
+### 3.2 Per-Package CLAUDE.md (monorepo only)
+
+For **each package** in the registry, generate `{package-path}/CLAUDE.md`.
+
+**HARD LIMIT: 150 lines per file. Package-specific info only.**
+
+```markdown
+# [Package Name]
+
+## Role
+[What this package does in the monorepo. 1-2 lines]
+
+## Stack
+[Only if different from or extending root — don't repeat]
+
+## Commands (run from this directory)
+- `[cmd]` — dev
+- `[cmd]` — test
+- `[cmd]` — build
+
+## Structure
+[2-3 depth directory structure from actual filesystem]
+
+## Architecture
+[Package-specific patterns. Actual code example from this package]
+
+## Key Patterns
+[With ACTUAL code snippets from this package's files]
+
+## Internal Dependencies
+- Uses `@repo/shared`: [what specifically]
+- Uses `@repo/ui`: [what specifically]
+
+## Gotchas
+[Package-specific traps discovered in analysis]
+```
 
 ### 3.3 .claude/settings.json
 
-```json
+```jsonc
 {
   "permissions": {
     "deny": [
-      "Read(./.env)",
-      "Read(./.env.*)",
-      "Read(./**/env)",
-      "Read(./**/env.*)",
-      "Read(./**/secrets/**)"
+      // From Analysis 4 danger map — sensitive files
     ]
   },
   "hooks": {
     "PreToolUse": [
+      // Hook 1: Branch protection
       {
         "matcher": "Edit|Write",
         "hooks": [
           {
             "type": "command",
-            "command": "[ \"$(git branch --show-current)\" != \"[actual-default-branch]\" ] || { echo '{\"block\": true, \"message\": \"Cannot edit on [default-branch] branch\"}' >&2; exit 2; }",
+            "command": "[ \"$(git branch --show-current)\" != \"[DETECTED-DEFAULT-BRANCH]\" ] || { echo 'Cannot edit on [DETECTED-DEFAULT-BRANCH] branch' >&2; exit 2; }",
             "timeout": 5
+          }
+        ]
+      },
+      // Hook 2: Dangerous command prevention
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[GENERATED SAFETY SCRIPT — see 3.3.1]",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      // Hook 3: Auto-save progress on session end
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[GENERATED PROGRESS SCRIPT — see 3.3.2]",
+            "timeout": 10
           }
         ]
       }
@@ -310,233 +352,525 @@ For **each package** in the registry, generate `{package-path}/CLAUDE.md`:
 }
 ```
 
+#### 3.3.1 Generate .claude/hooks/safety-check.sh
+
+Based on Analysis 4 findings, generate a project-specific safety script:
+
+```bash
+#!/bin/bash
+# Auto-generated from codebase analysis. Add rules as agent makes mistakes.
+INPUT="$1"
+
+# Dangerous deletions
+if echo "$INPUT" | grep -qE 'rm\s+-rf\s+(/|~|\$HOME|\./)'; then
+  echo "BLOCKED: Dangerous delete" >&2; exit 2
+fi
+
+# Force push
+if echo "$INPUT" | grep -qE 'git\s+push.*--force'; then
+  echo "BLOCKED: Force push" >&2; exit 2
+fi
+
+# [PROJECT-SPECIFIC: Generated from Analysis 4]
+# Example: if production DB URLs were found
+# if echo "$INPUT" | grep -qiE '[DETECTED-PROD-PATTERN]'; then
+#   echo "BLOCKED: Production access" >&2; exit 2
+# fi
+
+# [PROJECT-SPECIFIC: Dangerous scripts found in package.json]
+# if echo "$INPUT" | grep -qE '[DETECTED-DANGEROUS-SCRIPTS]'; then
+#   echo "BLOCKED: Dangerous script" >&2; exit 2
+# fi
+
+exit 0
+```
+
+#### 3.3.2 Generate .claude/hooks/session-end.sh
+
+```bash
+#!/bin/bash
+# Auto-update progress file on session end
+PROGRESS="claude-progress.txt"
+DATE=$(date +"%Y-%m-%d %H:%M")
+
+[ -f "$PROGRESS" ] || exit 0
+
+RECENT=$(git log --oneline -5 2>/dev/null)
+if [ -n "$RECENT" ]; then
+  echo "" >> "$PROGRESS"
+  echo "### Session $DATE" >> "$PROGRESS"
+  echo "$RECENT" >> "$PROGRESS"
+fi
+```
+
+Make hooks executable:
+```bash
+chmod +x .claude/hooks/*.sh
+```
+
 ### 3.4 .claude/rules/
 
-Generate **only rules that apply**:
+Generate **only rules files for which actual patterns were detected**. Each file must contain ACTUAL code examples from this project, not generic advice.
 
-**rules/code-style.md** — ONLY repo-wide style rules
-- Shared lint/format config rules in natural language
-- If packages override the shared config, note: "See per-package CLAUDE.md for overrides"
-
-**rules/architecture.md** — Repo-wide architecture rules
-- Cross-package dependency direction rules
-- How to add a new package
-- Shared code guidelines (when to extract vs keep local)
-
-**rules/testing.md** — Repo-wide test conventions
-- If test framework is consistent: document once here
-- If frameworks differ per package: document only shared principles, note variations
-
-**rules/git-workflow.md** — From actual git history
-
-**rules/monorepo-workflow.md** — MONOREPO-SPECIFIC (new, required for monorepos)
+**rules/code-style.md** — Only if actual style patterns were detected
 ```markdown
-# Monorepo Workflow Rules
+# Code Style
+
+## Naming
+[ACTUAL patterns from Analysis 6, with real examples]
+
+## Imports
+[ACTUAL import patterns, alias conventions, ordering]
+
+## Exports
+[ACTUAL export patterns: named vs default, barrel files]
+
+[IF MONOREPO]: Per-package overrides exist for: [list packages with different conventions]
+```
+
+**rules/architecture.md** — From Analysis 2
+```markdown
+# Architecture
+
+## Layer Structure
+[ACTUAL layer diagram from this project]
+
+## Module Dependencies
+[ACTUAL allowed/forbidden dependency directions]
+[In monorepos: cross-package dependency rules]
+
+## Key Patterns
+[ACTUAL patterns with code examples from this project]
+```
+
+**rules/testing.md** — Only if Analysis 7 was run and patterns detected
+```markdown
+# Testing
+
+## Framework
+[ACTUAL test framework + version]
+
+## File Locations
+[ACTUAL test file location pattern from this project]
+
+## Patterns
+[ACTUAL mocking/fixture patterns with code examples]
+
+## Running Tests
+[ACTUAL commands, verified working]
+```
+
+**rules/git-workflow.md** — Only if Analysis 5 was run
+```markdown
+# Git Workflow
+
+## Commit Convention
+[DETECTED from git log: conventional commits, gitmoji, or other]
+
+## Branch Naming
+[DETECTED from git branch output]
+
+## PR Process
+[DETECTED from PR templates or CONTRIBUTING.md]
+```
+
+**rules/monorepo-workflow.md** — ONLY for monorepos
+```markdown
+# Monorepo Workflow
 
 ## Cross-Package Changes
 When a change spans multiple packages:
-1. Start with the lowest-level dependency (e.g., @repo/shared)
-2. Build upward through the dependency chain
-3. Run `[actual typecheck command]` to verify compatibility
-4. Run affected tests: `[actual command]`
+1. Start with lowest-level dependency
+2. Build upward through dependency chain
+3. Run `[ACTUAL typecheck command]`
+4. Run affected tests: `[ACTUAL command]`
 
 ## Adding a New Package
-[Actual steps detected from existing package structure]
+[Steps detected from existing package structure and orchestrator config]
 
-## Shared Code Guidelines
-- Types used by 2+ packages → move to `[actual shared types path]`
-- Utilities used by 2+ packages → move to `[actual shared utils path]`
-- Never import from sibling app packages (apps must not import from other apps)
-- Libraries can only depend on other libraries, never on apps
+## Shared Code Rules
+- Types used by 2+ packages → `[ACTUAL shared types path]`
+- Utils used by 2+ packages → `[ACTUAL shared utils path]`
+- Apps must NOT import from other apps
+- Libraries can only depend on other libraries
 
-## Impact Analysis
-Before modifying a shared package, check dependents:
-`[actual command, e.g., turbo ls --filter=...depends-on=@repo/shared]`
+## Impact Check
+Before modifying a shared package: `[ACTUAL command to find dependents]`
 ```
 
-**rules/security.md** — Sensitive file patterns across all packages
+### 3.5 claude-progress.txt (REQUIRED in both modes)
 
-### 3.5 .claude/skills/
+Generate at project root:
 
-All skills live at root `.claude/skills/` but MUST be **package-aware**. Each skill's content should reference specific package paths. When patterns differ per package, include per-package sections.
+```markdown
+# Project Progress
 
-Generate only skills that match detected tech stack. Each SKILL.md:
+> Read this file at the start of every session.
+> Update before ending a session or when completing significant work.
+
+## Completed
+
+## In Progress
+
+## Known Issues
+
+## Next Session
+1.
+
+## Architecture Decisions
+- [DATE]: Bootstrap — .claude/ directory initialized
+
+## Session Log
+```
+
+### 3.6 .claude/LEARNING.md (REQUIRED in both modes)
+
+```markdown
+# Harness Evolution Log
+
+> When the agent makes a mistake, record it here and add a rule to prevent recurrence.
+> Use `/harness-update` to automate this process.
+> This file is the growth journal of this project's harness.
+
+| Date | Failure | Rule Added | Location |
+|------|---------|------------|----------|
+| [TODAY] | Initial bootstrap | Project-specific rules generated | .claude/rules/ |
+```
+
+### --- EXTENDED FILES (full mode only) ---
+
+> The following files are generated ONLY when $ARGUMENTS contains "full".
+> In minimal mode, skip to Phase 4.
+
+### 3.7 .claude/skills/
+
+All skills live at root `.claude/skills/` but MUST be **package-aware**. Each SKILL.md:
 - Under 300 lines
-- Rich trigger keywords in description
-- Actual code examples from this project
-- Per-package sections where patterns differ
-- Reference files with real paths
+- Includes Verification section (MANDATORY)
+- Uses ACTUAL code examples from this project
+- In monorepos: includes per-package sections where patterns differ
 
-**Required monorepo-specific skill: skills/cross-package-change/SKILL.md**
+Generate only skills that match detected tech stack.
+
+**MANDATORY skill template structure:**
+
+```markdown
+---
+name: [name]
+description: >
+  [What it does. Rich trigger keywords for auto-activation.]
+---
+
+# [Skill Name]
+
+## Procedure
+[Step-by-step. Reference actual project paths and commands.]
+
+## Patterns
+[ACTUAL code examples from this project. Not generic.]
+
+[IF MONOREPO]
+## Per-Package Notes
+- `[package-A]`: [specific differences]
+- `[package-B]`: [specific differences]
+[END IF]
+
+## Verification (REQUIRED — never skip)
+After completing work:
+1. Re-read the ORIGINAL requirement (not your own code)
+2. Run the relevant test/lint command: `[ACTUAL command]`
+3. In monorepos: run typecheck if cross-package changes were made
+4. Confirm each requirement is met by test output, not by re-reading your own code
+```
+
+**Skills to generate (only if matching tech detected):**
+
+| Condition | Skill |
+|-----------|-------|
+| Always | `implement-feature/SKILL.md` |
+| Always | `fix-bug/SKILL.md` |
+| Monorepo detected | `cross-package-change/SKILL.md` |
+| API/backend code | `api-endpoint/SKILL.md` |
+| React/Vue/Svelte | `component/SKILL.md` |
+| ORM/DB code | `db-migration/SKILL.md` |
+| CI/CD config | `pipeline/SKILL.md` |
+
+**MONOREPO-SPECIFIC SKILL: cross-package-change/SKILL.md** (REQUIRED for monorepos)
 ```markdown
 ---
 name: cross-package-change
 description: >
   Use when a change impacts multiple packages. Cross-package refactoring,
   shared type changes, dependency updates affecting multiple consumers.
-  Keywords: cross-package, shared, breaking change, dependency, monorepo
+  Triggers: cross-package, shared, breaking change, dependency, monorepo.
 ---
 
-# Cross-Package Change Procedure
+# Cross-Package Change
 
 ## Dependency Graph
-[Actual graph from Phase 0]
+[ACTUAL graph from Phase 0]
 
-## Step-by-Step
-1. Identify all affected packages
+## Procedure
+1. Identify all affected packages using: `[ACTUAL command to find dependents]`
 2. Make changes bottom-up: shared → libraries → apps
-3. After each layer, verify types and tests
-4. Search for all usages before changing public APIs
+3. After each layer, run: `[ACTUAL typecheck command]`
+4. Search for all usages before changing any public API: `grep -r "[symbol]" [paths]`
 
 ## Common Scenarios
-### Adding a field to a shared type
-[Step-by-step with actual paths]
+### Changing a shared type
+[Step-by-step with ACTUAL paths from this project]
 
 ### Upgrading a shared dependency
-[Step-by-step with actual commands]
+[Step-by-step with ACTUAL commands from this project]
+
+## Verification (REQUIRED — never skip)
+1. Run full typecheck: `[ACTUAL command]`
+2. Run tests for ALL affected packages: `[ACTUAL command]`
+3. Verify no unused imports or broken references remain
 ```
 
-Other skills (api-design, component-patterns, testing-patterns, etc.) follow standard structure but include per-package context where patterns differ.
+### 3.8 .claude/agents/
 
-### 3.6 .claude/agents/
+All agents MUST include a **Context Loading** section and be **package-context-aware**.
 
-All agents MUST be **package-context-aware**. System prompts must instruct agents to first determine which package they're operating in, then apply the correct patterns.
+**MANDATORY agent template structure:**
 
-**agents/code-reviewer.md** (REQUIRED)
 ```yaml
 ---
-name: code-reviewer
+name: [name]
 description: >
-  Code review and change analysis. Monorepo-aware — applies correct
-  conventions per package. Checks cross-package compatibility.
-tools: Read, Grep, Glob
-model: sonnet
+  [Role. When to use. Package-aware behavior.]
+tools: [allowed tools]
 ---
 ```
-System prompt must include:
-- Package registry table for context detection
+
+```markdown
+# [Agent Name]
+
+## Context Loading (read these before starting work)
+- Root: CLAUDE.md (for project overview and package registry)
+- Package: {relevant-package}/CLAUDE.md (for package-specific rules)
+- Rules: .claude/rules/[relevant].md
+- Progress: claude-progress.txt (for current project state)
+
+## Role
+[What this agent does]
+
+## Procedure
+[Step-by-step including package detection]
+
+## Output Format
+[Structured output format]
+```
+
+**Agents to generate:**
+
+| Agent | When |
+|-------|------|
+| `code-reviewer.md` | Always |
+| `test-writer.md` | Always |
+| `refactor-planner.md` | Full mode |
+| `security-auditor.md` | If auth/security code detected |
+
+**code-reviewer.md** — Include:
+- Package registry for context detection
 - Per-package review criteria
-- Cross-package review rules (dependency direction, breaking changes, consumer updates)
+- Cross-package review rules (monorepo)
 - Output grouped by package then severity
 
-**agents/test-writer.md** (REQUIRED)
-System prompt must include per-package test details:
-- Which test framework each package uses
-- Test file location per package
-- Test command per package
+**test-writer.md** — Include:
+- Per-package test frameworks, file locations, commands
 - Mocking patterns per package
+- ACTUAL test examples from this project
 
-**agents/refactor-planner.md** (REQUIRED)
-System prompt must include cross-package impact analysis.
+### 3.9 .claude/commands/
 
-**agents/security-auditor.md** (if auth/security code detected)
+Commands must handle monorepo context — either auto-detecting package from file paths or accepting via $ARGUMENTS.
 
-### 3.7 .claude/commands/
+**REQUIRED commands (both modes):**
 
-Commands must handle monorepo context — either auto-detecting the relevant package from file paths or accepting it via $ARGUMENTS.
+**commands/harness-update.md** (REQUIRED — the most important command)
+```markdown
+Update the harness based on a failure or new learning.
 
-**commands/review.md** (REQUIRED)
+If $ARGUMENTS is empty, ask: "What went wrong, or what pattern should be added?"
+
+1. Classify the update:
+   - Agent made a coding mistake → add to CLAUDE.md or rules/ forbidden patterns
+   - Repeated workflow is tedious → create a new skill in .claude/skills/
+   - Safety/security gap → add to settings.json deny or hooks
+   - Architecture violation occurred → update rules/architecture.md
+   - Wrong command was used → update CLAUDE.md commands section
+
+2. Make the change to the correct file
+
+3. Append to .claude/LEARNING.md:
+   | [TODAY'S DATE] | [brief failure description] | [rule added] | [file path] |
+
+4. Confirm: "Harness updated. [description of what was added and where]."
+```
+
+**REQUIRED commands (full mode only):**
+
+**commands/review.md**
 ```markdown
 Review code changes in the current branch.
 
-1. Run `git diff [default-branch]...HEAD --name-only` to get changed files
-2. Group changed files by package using the package registry
-3. For each affected package, use the code-reviewer agent
-4. If changes span multiple packages, additionally check:
+1. Run `git diff [DETECTED-DEFAULT-BRANCH]...HEAD --name-only`
+2. [IF MONOREPO]: Group changed files by package using the package registry
+3. For each affected area, load relevant CLAUDE.md and rules
+4. Review for: correctness, security, performance, style compliance
+5. [IF MONOREPO + multi-package changes]: Additionally check:
    - Cross-package type compatibility
    - Dependency direction compliance
    - Shared package breaking changes
+6. Output: issues grouped by severity (🔴 high / 🟡 medium / 🟢 low)
 
-If $ARGUMENTS is provided, focus on those files/packages only.
+If $ARGUMENTS provided, focus on those files/packages only.
 ```
 
-**commands/test-for.md** (REQUIRED)
+**commands/test-for.md**
 ```markdown
 Write tests for $ARGUMENTS.
 
-1. Determine which package $ARGUMENTS belongs to by checking its file path
-2. Read that package's CLAUDE.md for testing conventions
-3. Use the test-writer agent with package-specific context
-4. Run the CORRECT test command for that package:
-   [per-package test command table]
+1. Determine which package $ARGUMENTS belongs to
+2. Read that package's CLAUDE.md + .claude/rules/testing.md
+3. Detect test framework and patterns for that package
+4. Write tests following the project's ACTUAL test patterns
+5. Run: `[CORRECT test command for the detected package]`
+6. Verify all new tests pass
+
+Per-package test commands:
+[TABLE from Phase 1 Analysis 3]
 ```
 
-**commands/add-feature.md** (REQUIRED)
+**commands/add-feature.md**
 ```markdown
 Add a new feature: $ARGUMENTS
 
 1. Determine which package(s) this feature belongs to
-2. If it spans multiple packages, plan bottom-up:
-   shared types → libraries → apps
-3. For each package, follow that package's architecture pattern
-4. After implementation:
-   - Run typecheck for cross-package validation
-   - Test all affected packages
-   - code-reviewer agent for final check
+2. [IF multi-package]: Plan bottom-up (shared → libraries → apps)
+3. Load relevant CLAUDE.md files and rules
+4. Use implement-feature skill for the workflow
+5. After implementation:
+   - Run typecheck: `[ACTUAL command]`
+   - Run tests: `[ACTUAL command]`
+   - Self-review changes before reporting
+
+If unclear which package, ask before proceeding.
 ```
 
-**commands/check-impact.md** (REQUIRED for monorepos)
+**commands/check-impact.md** (monorepo only)
 ```markdown
-Analyze the impact of changes to $ARGUMENTS.
+Analyze impact of changes to $ARGUMENTS.
 
 1. Identify which package $ARGUMENTS belongs to
-2. Find all dependent packages (direct + transitive)
-3. For each dependent, identify which imports/symbols they use
-4. Report: affected packages, risk level, required follow-up actions
+2. Trace dependency graph to find all dependents (direct + transitive)
+3. For each dependent, find specific imports/usages
+4. Report:
+   - Affected packages (with dependency distance)
+   - Risk level per package (high if public API changed, low if internal)
+   - Required follow-up actions
+   - Suggested test commands for each affected package
 ```
-
-**commands/refactor.md**
-**commands/explain.md**
 
 ---
 
-## Phase 4: Validation & Report
+## Phase 4: Validation
 
-After generating all files:
+After generating all files, perform validation in order.
 
-1. **Structure check**: Print the full generated file tree including per-package CLAUDE.md files
+### 4.1 Structure check
+Print the full generated file tree:
+```
+.claude/
+├── CLAUDE.md
+├── settings.json
+├── LEARNING.md
+├── hooks/
+│   ├── safety-check.sh
+│   └── session-end.sh
+├── rules/
+│   ├── ...
+├── [IF FULL] skills/
+│   ├── ...
+├── [IF FULL] agents/
+│   ├── ...
+└── [IF FULL] commands/
+    ├── harness-update.md
+    ├── ...
+[IF MONOREPO]:
+apps/web/CLAUDE.md
+apps/api/CLAUDE.md
+packages/shared/CLAUDE.md
+...
+claude-progress.txt
+```
 
-2. **Consistency validation**:
-   - Root CLAUDE.md package registry matches actual workspace packages
-   - Dependency graph is accurate
-   - Per-package CLAUDE.md commands are correct (test by running them)
-   - Per-package CLAUDE.md files don't duplicate root-level info
-   - Skill reference files actually exist
-   - Agent package-specific checklists match actual patterns
-   - All commands reference correct per-package test/build/lint commands
+### 4.2 Consistency validation
+- Root CLAUDE.md ≤ 200 lines
+- Per-package CLAUDE.md ≤ 150 lines each
+- Root CLAUDE.md package registry matches actual workspace packages
+- Per-package CLAUDE.md files don't duplicate root-level info
+- All referenced file paths in rules/skills actually exist in project
 
-3. **Summary report**:
+### 4.3 Execution validation (CRITICAL — do not skip)
+Run each detected command to verify it works:
+```bash
+# Verify test command exists
+[DETECTED-TEST-CMD] --help 2>/dev/null || echo "WARNING: test command not found"
+
+# Verify lint command exists
+[DETECTED-LINT-CMD] --help 2>/dev/null || echo "WARNING: lint command not found"
+
+# Verify build command exists
+[DETECTED-BUILD-CMD] --help 2>/dev/null || echo "WARNING: build command not found"
+
+# Verify hooks are executable
+test -x .claude/hooks/safety-check.sh || echo "WARNING: safety hook not executable"
+test -x .claude/hooks/session-end.sh || echo "WARNING: session hook not executable"
+```
+If any command fails, fix the CLAUDE.md entry before proceeding.
+
+### 4.4 Summary report
+
 ```
 ## Bootstrap Complete
 
-### Monorepo Topology
-[type]: [N] packages detected
-
-### Package Registry
-[table]
-
-### Dependency Graph
-[graph]
+### Mode: [minimal | full]
+### Topology: [single-project | monorepo:[type]]
+[IF MONOREPO]: [N] packages detected
 
 ### Generated Files
-- Root CLAUDE.md: [line count]
-- Per-package CLAUDE.md: [count] files, [list paths]
-- Rules: [count] files
-- Skills: [count] files
-- Agents: [count] files
-- Commands: [count] files
+[Full file list with line counts]
 
+### Danger Map
+- Denied paths: [count]
+- Hook blocks: [count]
+- Branch protection: [default-branch]
+
+[IF MONOREPO]:
 ### Cross-Package Insights
-- Highest fan-in: [name] (depended on by [N] packages)
-- Unique tech stacks: [any packages that differ]
-- Circular dependencies: [none / list]
+- Highest fan-in: [name] ([N] dependents)
+- Unique stacks: [any packages with different frameworks]
+- Circular dependencies: [none | list]
 
-### Recommended Follow-up
-- [ ] Review root CLAUDE.md package registry
-- [ ] Review each per-package CLAUDE.md for missed gotchas
-- [ ] Verify monorepo-workflow.md cross-package rules
-- [ ] Test /check-impact on a shared package change
-- [ ] Use # key to add repeated instructions during sessions
+### ⚡ Immediate Actions (do now, 5 minutes)
+- [ ] Skim CLAUDE.md — is the package registry accurate?
+- [ ] Check settings.json deny list — any missing sensitive files?
+- [ ] Verify hook permissions: `ls -la .claude/hooks/`
+
+### 📈 First Week
+- [ ] When agent makes a mistake → run `/harness-update`
+- [ ] After 3 days, review .claude/LEARNING.md for patterns
+- [ ] If a workflow repeats 3+ times → promote to a skill
+[IF MINIMAL]:
+- [ ] When ready for skills/agents/commands → run `/bootstrap full`
+
+### 🚫 Don't Do
+- Don't try to perfect every rule upfront
+- Don't add generic advice ("write clean code") to any file
+- The harness grows by USING it, not by pre-planning it
 ```
 
 ---
@@ -544,9 +878,14 @@ After generating all files:
 ## Absolute Rules
 
 1. **No guessing**: If not discovered in analysis, don't generate it.
-2. **No generic advice**: No "write clean code" or "follow SOLID" in any file.
-3. **Use actual code examples**: All examples from actual project files.
-4. **Token efficiency**: No duplication. Per-package CLAUDE.md must not repeat root info.
-5. **Monorepo hierarchy is sacred**: Root = repo-wide only. Per-package = package-specific only.
-6. **Package-awareness everywhere**: Every skill, agent, and command must determine and adapt to the correct package context.
-7. **ultrathink**: Think deeply and thoroughly.
+2. **No generic advice**: No "write clean code" or "follow SOLID" in any file. Every rule must be project-specific.
+3. **Use actual code examples**: All examples from actual project files. Zero generic snippets.
+4. **Line limits are hard**: Root CLAUDE.md ≤ 200 lines. Per-package ≤ 150 lines. Skills ≤ 300 lines.
+5. **CLAUDE.md is a table of contents**: It points to rules/, not contains them.
+6. **Monorepo hierarchy is sacred**: Root = repo-wide only. Per-package = package-specific only. Never duplicate.
+7. **Package-awareness everywhere**: Every skill, agent, and command must detect and adapt to the correct package context.
+8. **Every skill has Verification**: No skill is complete without a Verification section that uses actual test commands.
+9. **Every agent has Context Loading**: No agent starts work without reading the relevant CLAUDE.md and rules.
+10. **Harness-update is the most important command**: Without it, the harness is static. With it, the harness compounds.
+11. **Execution validation is mandatory**: Never report a command without verifying it actually works.
+12. **ultrathink**: Think deeply and thoroughly.

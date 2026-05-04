@@ -7,7 +7,10 @@
       "Read(**)",
       "Write(**)",
       "Search(**)",
-      "mcp__filesystem__read_multiple_files"
+      "mcp__filesystem__read_multiple_files",
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:tkdodo.eu)"
     ],
     "deny": [
       "Bash(git reset*)",
@@ -62,5 +65,6 @@
   "enabledPlugins": {
     "superpowers@superpowers-marketplace": true
   },
-  "skipDangerousModePermissionPrompt": true
+  "skipDangerousModePermissionPrompt": true,
+  "theme": "dark-ansi"
 }

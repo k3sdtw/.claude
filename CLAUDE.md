@@ -3,6 +3,8 @@
 ## When writing the code (IMPORTANT) 
 
 - Do not use abstract words for all function names, variable names. (e.g. Info, Data, Item etc..)
+- Follow naming conventions: [rules/common/naming-conventions.md](rules/common/naming-conventions.md) — prefer the shortest unambiguous name (e.g. `getList` → `list`, `findUserById` → `find`).
+- Use the **namer** agent ([agents/namer.md](agents/namer.md)) when proposing or reviewing identifier names; run `/check-naming` ([commands/check-naming.md](commands/check-naming.md)) to audit existing code.
 
 # CLAUDE.md
 

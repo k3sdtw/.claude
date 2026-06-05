@@ -6,6 +6,16 @@
 - Follow naming conventions: [rules/common/naming-conventions.md](rules/common/naming-conventions.md) — prefer the shortest unambiguous name (e.g. `getList` → `list`, `findUserById` → `find`).
 - Use the **namer** agent ([agents/namer.md](agents/namer.md)) when proposing or reviewing identifier names; run `/check-naming` ([commands/check-naming.md](commands/check-naming.md)) to audit existing code.
 
+## DevOps / Infra (AWS · Terraform · EKS · GitHub Actions)
+
+환경: AWS 자원이 **콘솔(legacy) ↔ Terraform**로 분리됨 · 서비스는 **EKS + GitOps(ArgoCD/Flux)** · CI/CD는 **GitHub Actions** · **비용은 MSP 대시보드 별도(harness 범위 밖)**.
+
+- **실행 안전(필독)**: 읽기는 자동, 변경(apply/delete/sync/rerun)은 승인 — [rules/devops/safety.md](rules/devops/safety.md). 대상 account/region/context를 항상 먼저 확인.
+- 지식: [rules/devops/](rules/devops/) — terraform · kubernetes · github-actions · aws · safety
+- command: `/infra` ([commands/infra.md](commands/infra.md)) — `tf-import` · `drift` · `eks-debug` · `ci-debug` · `inventory`
+- agent: **terraform-reviewer** · **eks-doctor** · **cicd-reviewer** · **aws-auditor**
+- skill(자동 활성화): **terraform** · **eks** · **github-actions**
+
 # CLAUDE.md
 
 Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-specific instructions as needed.

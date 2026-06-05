@@ -17,6 +17,12 @@ Located in `~/.claude/agents/`:
 | performance-reviewer | Performance review | Query, rendering, bundle optimization |
 | ux-reviewer | Frontend UX review | Accessibility, responsive, interaction |
 | build-error-resolver | Fix build errors | When build fails |
+| terraform-reviewer | Terraform plan·HCL 안전성 리뷰 | apply 전, .tf 변경·import 검토 |
+| eks-doctor | EKS/Kubernetes 장애 진단 (GitOps) | pod/배포 장애, CrashLoop·OOM·OutOfSync |
+| cicd-reviewer | GitHub Actions 워크플로우 리뷰 | .github/workflows 작성·수정 후 |
+| aws-auditor | AWS 읽기 전용 보안·정합성 감사 | 보안 점검, 콘솔↔IaC 격차 (비용 제외) |
+
+> DevOps agent의 실행 안전 기준은 [rules/devops/safety.md](../devops/safety.md) (읽기 자동 / 변경 승인).
 
 ## Immediate Agent Usage
 

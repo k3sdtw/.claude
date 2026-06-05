@@ -2,7 +2,7 @@
 name: schema-designer
 description: Database schema design specialist for data modeling, normalization, relationships, and type selection. Use PROACTIVELY when designing new tables, modifying schemas, or planning database structure. Supports Drizzle ORM, Prisma, TypeORM, and raw SQL.
 tools: ["Read", "Write", "Edit", "Bash", "Grep", "Glob"]
-model: opus
+model: sonnet
 ---
 
 # Schema Designer

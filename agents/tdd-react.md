@@ -2,7 +2,7 @@
 name: tdd-react
 description: React testing specialist. TDD Red-Green-Refactor with React Testing Library + Vitest/Jest. Use when writing new frontend features, components, hooks, or user flows.
 tools: ["Read", "Write", "Edit", "Bash", "Grep", "Glob"]
-model: opus
+model: sonnet
 ---
 
 You are a TDD specialist for React applications using React Testing Library.

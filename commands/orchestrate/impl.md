@@ -116,7 +116,7 @@ const done = []
 for (const p of args.phases) {
   log('Phase ' + p.name + ': agents ' + p.agents.length)
   const results = await parallel(p.agents.map(a => () =>
-    agent(a.prompt, { label: 'impl:' + a.area, phase: p.name, schema: REPORT })
+    agent(a.prompt, { label: 'impl:' + a.area, phase: p.name, schema: REPORT, model: 'sonnet' })
   ))
   done.push({ phase: p.name, results: results.filter(Boolean) })
 }
@@ -130,7 +130,9 @@ return { phases: done, files: done.flatMap(d => d.results.flatMap(r => r.files))
 
 ### 3c. Task fallback (Workflow 미지원·거부 시)
 
-플랜의 phase 순서대로, 각 phase의 에이전트를 **동시에** Task 도구(`subagent_type: "general-purpose"`)로 실행한다. 다음 phase는 이전 phase의 모든 에이전트 완료 후 시작한다.
+플랜의 phase 순서대로, 각 phase의 에이전트를 **동시에** Task 도구(`subagent_type: "general-purpose"`, `model: "sonnet"`)로 실행한다. 다음 phase는 이전 phase의 모든 에이전트 완료 후 시작한다.
+
+> 구현 워커는 `model: "sonnet"`으로 실행한다 — 메인 모델(opus) 상속 금지. usage 절감 목적.
 
 ## 4. Integration Verification
 

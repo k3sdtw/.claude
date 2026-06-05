@@ -152,6 +152,7 @@ main 모드에서는 gtr을 사용하지 않는다.
 7. Expert review·impl 에이전트는 반드시 병렬 실행한다 — **Workflow 도구 우선**, 미지원 시 Task 병렬 (각 sub-command 파일 참조)
 8. **State JSON이 권위적 소스** — 에이전트는 state JSON에서 읽되, plan markdown을 파싱하지 않는다
 9. **main 모드에서는 push·PR을 자동 실행하지 않는다** — commit까지만 하고 push는 사용자에게 안내한다
+10. **동시 워크플로우 최대 2개** — 모든 세션이 하나의 usage limit을 공유한다. start phase에서 `plans/*.state.json` 중 진행 중(currentPhase ≠ "completed")인 워크플로우가 이미 2개 이상이면 사용자에게 경고하고, 기존 워크플로우 완료 후 순차 시작을 권고한다. 다른 worktree·레포에서 병렬 실행 중인 세션은 감지할 수 없으므로 사용자에게 한 번 확인한다
 
 ## Idempotency (재진입 처리)
 
@@ -193,7 +194,7 @@ main 모드에서는 gtr을 사용하지 않는다.
 2. Gate에서 사용자 확인을 받으면 **즉시 다음 phase 파일을 Read하여 실행**한다
 3. sub-command 파일 끝의 `→ 다음: /orchestrate:xxx` 안내는 **무시**한다 — 자동으로 진행한다
 4. 어떤 phase에서든 STOP이 발생하면 전체 워크플로우를 중단하고 사용자에게 보고한다
-5. **Gate 통과 직후**(다음 phase 파일을 Read하기 전)는 컨텍스트 압축의 최적 시점이다 — 컨텍스트가 길어졌다면 사용자에게 `/compact`를 제안한다. 재개 컨텍스트는 모두 state JSON에 있으므로 압축해도 안전하다
+5. **Phase 경계 compact (필수)** — 각 phase 완료 후, 다음 phase 파일을 Read하기 **전에** 사용자에게 `/compact` 실행을 요청하고 대기한다. Gate가 있는 경계(start→review, review→impl, done의 Gate 3)는 Gate 승인 메시지에 compact 요청을 함께 포함하고, Gate가 없는 경계(impl→done)도 verification 통과 보고 시 동일하게 요청한다. 재개 컨텍스트는 모두 state JSON에 영속되므로 압축해도 안전하다. 사용자가 compact를 건너뛰겠다고 명시한 경우에만 생략한다
 
 ## Resuming Mid-Workflow (개별 sub-command)
 

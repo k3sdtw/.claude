@@ -15,11 +15,10 @@ Prerequisite: `/orchestrate:start`에서 플랜 작성 완료 + Gate 1 통과.
    - 파일 없음 → STOP: "`/orchestrate:start`를 먼저 실행하세요"
    - 파일 여러 개 → 목록을 보여주고 AskUserQuestion으로 선택 요청
 2. **State 읽기**: Read 도구로 state.json을 읽고 JSON 파싱
-3. **Worktree 확인**: `worktreePath` 디렉토리가 존재하는지 Bash `ls {worktreePath}`로 확인 → 없으면 STOP
-4. **작업 디렉토리 전환**: Bash `cd {worktreePath}` 실행. 이후 모든 명령은 이 디렉토리에서 실행
-5. **브랜치 확인**: `git branch --show-current` → main이면 STOP
-6. **필드 추출**: jiraKey, projectType, techStack, commands, planFile, branchName, baseBranch 등 필요한 값 보관
-7. **Phase 갱신**: state의 `currentPhase`를 `"review"`로, `updatedAt`을 현재 시각으로 갱신 → Write로 저장
+3. **작업 디렉토리 전환**: `workPath` 디렉토리 존재 확인 후 Bash `cd {workPath}` 실행 → 없으면 STOP. 이후 모든 명령은 이 디렉토리에서 실행
+4. **브랜치 확인** (worktree 모드만): `git branch --show-current`가 `branchName`과 일치하는지 확인 → 불일치 시 STOP. main 모드는 생략
+5. **필드 추출**: workspace, projectType, techStack, commands, planFile, branchName, baseBranch 등 필요한 값 보관
+6. **Phase 갱신**: state의 `currentPhase`를 `"review"`로, `updatedAt`을 현재 시각으로 갱신 → Write로 저장
 
 ## 1. Read Plan
 
@@ -84,7 +83,11 @@ ux-reviewer는 프론트엔드 관점의 리뷰 포커스를 그대로 유지한
 
 ## 4. Launch Reviews (병렬)
 
-선택된 그룹의 **모든 에이전트를 동시에** Task 도구로 실행한다.
+선택된 그룹의 **모든 에이전트를 동시에** 실행한다. **Workflow 도구 우선**(4b), 미지원·권한 거부 시 Task 병렬 fallback(4c).
+
+> 이 스킬의 지시에 의한 Workflow 호출이므로 multi-agent orchestration opt-in 조건을 충족한다.
+
+### 4a. 에이전트 프롬프트 (공통)
 
 **각 에이전트 프롬프트에 반드시 포함할 내용:**
 
@@ -92,7 +95,7 @@ ux-reviewer는 프론트엔드 관점의 리뷰 포커스를 그대로 유지한
 당신은 {agent_type} 전문가입니다.
 
 ## 컨텍스트
-- 프로젝트 경로: {worktreePath}
+- 프로젝트 경로: {workPath}
 - 기술 스택: {state JSON의 techStack 값}
 - 플랜 파일: {planFile의 절대 경로}
 
@@ -102,15 +105,9 @@ ux-reviewer는 프론트엔드 관점의 리뷰 포커스를 그대로 유지한
    {해당 에이전트의 Review Focus — 위 테이블에서 복사}
 3. 프로젝트 소스코드를 탐색하여 기존 패턴·규칙과의 일관성을 확인하세요.
 {REACT_SKILL_BLOCK}
-
-## 출력 형식
-발견사항을 아래 형식으로 보고하세요. 문제가 없으면 "No concerns"만 출력.
-
-- [CRITICAL] {발견} → {권고}
-- [HIGH] {발견} → {권고}
-- [MEDIUM] {발견} → {권고}
-- [LOW] {발견} → {권고}
 ```
+
+> 출력 형식은 실행 경로가 결정한다 — Workflow(4b)는 schema가 강제하므로 프롬프트에 넣지 않고, Task(4c)는 JSON 형식 블록을 덧붙인다.
 
 **조건부 삽입: `{REACT_SKILL_BLOCK}`**
 
@@ -130,15 +127,94 @@ React 프로젝트(Section 3 감지 조건 참조)이고 해당 에이전트가 
    - [HIGH] async-parallel 위반: 독립적인 fetch가 순차 실행됨 → Promise.all()로 병렬화 권고
 ```
 
-## 5. Aggregate & Fix (최대 2회)
+### 4b. Workflow 실행 (기본)
 
-모든 에이전트 결과를 수집하여 통합 리포트를 사용자에게 보여준다.
+Workflow 도구에 아래 스크립트를 inline `script`로 전달해 실행한다.
+schema가 출력 구조를 강제하므로 **프롬프트에 출력 형식을 넣지 않는다.**
+
+**args** — 4a 템플릿을 채운 전문을 에이전트별로 전달 (실제 JSON 값으로, 문자열 인코딩 금지):
+
+```jsonc
+{
+  "reviewers": [
+    { "agentType": "architect", "prompt": "{4a 템플릿을 채운 전문}" },
+    { "agentType": "security-reviewer", "prompt": "..." }
+    // ... 선택된 그룹의 모든 에이전트
+  ]
+}
+```
+
+**script:**
+
+```javascript
+export const meta = {
+  name: 'orchestrate-review',
+  description: '플랜 expert review — agent group 병렬 실행, 구조화된 findings 반환',
+  phases: [{ title: 'Review' }],
+}
+const FINDINGS = {
+  type: 'object',
+  required: ['agent', 'findings'],
+  properties: {
+    agent: { type: 'string' },
+    findings: {
+      type: 'array',
+      items: {
+        type: 'object',
+        required: ['severity', 'finding', 'recommendation'],
+        properties: {
+          severity: { type: 'string', enum: ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'] },
+          finding: { type: 'string' },
+          recommendation: { type: 'string' },
+          file: { type: 'string' }
+        }
+      }
+    }
+  }
+}
+phase('Review')
+const results = await parallel(args.reviewers.map(r => () =>
+  agent(r.prompt, { label: 'review:' + r.agentType, agentType: r.agentType, schema: FINDINGS })
+))
+const reviews = results.filter(Boolean)
+const all = reviews.flatMap(r => r.findings)
+log(reviews.length + '/' + args.reviewers.length + ' reviews, ' + all.length + ' findings')
+return {
+  reviews,
+  criticalOrHigh: all.filter(f => f.severity === 'CRITICAL' || f.severity === 'HIGH')
+}
+```
+
+반환값의 `reviews`(에이전트별 findings)와 `criticalOrHigh`를 Section 5에서 사용한다.
+수정 후 일부 에이전트만 재실행할 때는 `reviewers`에 해당 에이전트만 담아 재호출한다.
+
+### 4c. Task fallback (Workflow 미지원·거부 시)
+
+모든 에이전트를 동시에 Task 도구로 실행한다. 4a 프롬프트 끝에 아래 출력 형식을 덧붙인다:
+
+```
+## 출력 형식
+아래 JSON 하나만 출력하세요 (다른 텍스트 없이):
+{
+  "agent": "{agent_type}",
+  "findings": [
+    { "severity": "CRITICAL | HIGH | MEDIUM | LOW", "finding": "...", "recommendation": "..." }
+  ]
+}
+문제가 없으면 "findings": []
+```
+
+## 5. Aggregate & Fix (state의 `attempts.planFix`로 추적, 최대 2회)
+
+구조화된 findings를 severity별로 정리해 통합 리포트를 사용자에게 보여준다.
 
 | 조건 | 행동 |
 |------|------|
-| CRITICAL 또는 HIGH 발견 | 플랜을 수정하고 수정 내역을 보고. 수정 후 해당 에이전트만 재실행 |
+| CRITICAL 또는 HIGH 발견 | `attempts.planFix` +1 → state Write → 플랜 수정·수정 내역 보고 → **해당 에이전트만** 재실행 |
 | MEDIUM 이하만 | 사용자에게 보고 후 진행 여부 확인 |
-| 2회 수정 후에도 CRITICAL 남음 | STOP: 사용자에게 수동 판단 요청 |
+| `attempts.planFix` = 2인데 CRITICAL 잔존 | STOP: 사용자에게 수동 판단 요청 |
+
+> 카운터는 state에 영속된다 — 세션이 끊겨도 한도가 유지된다.
 
 ## 6. Approve
 
@@ -168,7 +244,7 @@ state JSON을 Read → 아래 필드 갱신 → Write:
 사용자가 확인하면 → state JSON을 Read → 아래 필드 갱신 → Write:
 ```jsonc
 {
-  "gates": { "expertApproved": true },
+  "gates": { "review": true },
   "currentPhase": "impl",
   "updatedAt": "{현재 ISO 8601}"
 }

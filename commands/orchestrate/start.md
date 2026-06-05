@@ -1,32 +1,20 @@
 ---
-description: Start orchestrate workflow. Jira check → requirements Q&A → (issue creation) → branch setup → plan writing.
+description: Start orchestrate workflow. Requirements Q&A → workspace setup → plan writing.
 ---
 
 # Start Orchestrate
 
 ## 0. Idempotency Check
 
-사용자가 제공한 Jira 키 또는 feature slug로 **기존 worktree가 있는지** 확인한다:
-
-1. `git worktree list`를 실행하여 해당 identifier를 포함하는 worktree가 있는지 검색
-2. 매칭되는 worktree가 있으면 → 해당 worktree의 `plans/*.state.json`을 Glob으로 검색
-3. state가 존재하면:
+1. 현재 repo의 `plans/*.state.json`을 Glob으로 검색한다
+2. 동일하거나 유사한 identifier의 state가 존재하면:
    - AskUserQuestion: "기존 워크플로우({identifier}, phase: {currentPhase})를 이어서 진행할까요, 새로 시작할까요?"
-   - 이어서 진행 → state의 `currentPhase`에 해당하는 sub-command 안내
+   - 이어서 진행 → state의 `currentPhase`에 해당하는 sub-command로 재개
    - 새로 시작 → 기존 state 파일 삭제 후 계속
-4. 매칭되는 worktree가 없으면 → 정상 진행
+3. worktree 모드(`--worktree`)면 `git worktree list`로 동일 identifier의 worktree도 확인한다
+4. 매칭되는 것이 없으면 → 정상 진행
 
-## 1. Jira Check
-
-AskUserQuestion으로 사용자에게 확인:
-
-| 답변 | 행동 |
-|------|------|
-| 기존 Jira 키 입력 (예: GIFCA-123) | `mcp__jira__jira_get_issue`로 이슈 조회 → step 3 건너뜀 |
-| 새로 만들겠다 | Q&A 후 step 3에서 이슈 생성 |
-| Jira 없이 진행 | MODE = standalone, Jira 관련 step 모두 건너뜀 |
-
-## 2. Requirements Q&A
+## 1. Requirements Q&A
 
 사용자와 인터랙티브 인터뷰를 진행한다. 목표: 구현에 필요한 최소한의 명확한 요구사항 확보.
 
@@ -46,19 +34,26 @@ AskUserQuestion으로 사용자에게 확인:
 
 **출력:** 구조화된 요구사항 문서 (plan 작성에 사용)
 
-## 3. Create Jira Issue (새 이슈만 — 기존 키 or standalone이면 건너뜀)
+## 2. Identifier 결정
 
-AskUserQuestion으로 project key 확인 후:
-```
-mcp__jira__jira_create_issue({
-  project_key: "{확인된 key}",
-  summary: "{feature 요약}",
-  issue_type: "Task",
-  description: "## Background\n## Tasks\n## Done Criteria\n## References"
-})
+feature 요약에서 kebab-case slug를 생성한다 (예: `add-dashboard`, `voucher-notification`).
+이 값이 state의 `identifier`이자, worktree 모드의 브랜치명이 된다.
+
+## 3. Workspace Setup
+
+### main 모드 (기본 — `--worktree` 플래그 없음)
+
+워크스페이스를 만들지 않는다. **현재 체크아웃에서 그대로 개발한다.**
+
+```bash
+WORK_PATH=$(git rev-parse --show-toplevel)
+git status --porcelain
 ```
 
-## 4. Workspace Detection
+- `workspace = "main"`, `branchName = null`, `workPath = WORK_PATH`
+- working tree에 **기존 변경사항이 있으면** 사용자에게 알리고 진행 여부를 확인한다 — orchestrate의 변경분과 섞여 커밋 범위가 오염되는 것을 방지
+
+### worktree 모드 (`--worktree`)
 
 > **CRITICAL: gtr은 Git subcommand다. 반드시 `git gtr`로 실행해야 한다. `gtr` 단독 실행은 command not found.**
 
@@ -68,39 +63,27 @@ git gtr list 2>/dev/null && echo "GTR_AVAILABLE" || echo "GTR_NOT_AVAILABLE"
 
 # WRONG — 절대 이렇게 실행하지 않는다
 # gtr list                    ← command not found
-# gtr new branch-name         ← command not found
 ```
 
 | 결과 | 행동 |
 |------|------|
-| `GTR_AVAILABLE` 출력 | WORKSPACE = worktree (기본, 항상 우선) |
-| `GTR_NOT_AVAILABLE` 출력 또는 command not found | WORKSPACE = branch (fallback) |
-
-> 이미 worktree 안에 있어도 (`.git`이 파일인 경우) WORKSPACE = worktree로 설정
-
-## 5. Create Workspace (main에서 직접 개발 금지)
-
-### Worktree (기본)
+| `GTR_AVAILABLE` | worktree 생성 진행 |
+| `GTR_NOT_AVAILABLE` | **STOP**: "gtr(git-worktree-runner)이 설치되어 있지 않습니다. 설치 후 다시 실행하거나, 플래그 없이 main 모드로 진행하세요" |
 
 아래 명령어를 **정확히 이 순서로, 이 형태 그대로** 실행한다:
 
 ```bash
-# 1. main repo root 저장
-MAIN_REPO=$(git rev-parse --show-toplevel)
+# 1. 브랜치명 = identifier
+BRANCH_NAME="{identifier}"
 
-# 2. 브랜치명 결정
-BRANCH_NAME="{JIRA-KEY}-{slug}"  # standalone이면 "{slug}"
-
-# 3. worktree 생성 — 반드시 "git gtr" 형태로 실행
+# 2. worktree 생성 — 반드시 "git gtr" 형태로 실행
 git gtr new "$BRANCH_NAME"
-#    ^^^
-#    "git gtr new" 이다. "gtr new"가 아니다.
 
-# 4. worktree 경로 획득
-WORKTREE_PATH=$(git worktree list | grep "$BRANCH_NAME" | awk '{print $1}')
+# 3. worktree 경로 획득
+WORK_PATH=$(git worktree list | grep "$BRANCH_NAME" | awk '{print $1}')
 
-# 5. worktree 진입 및 검증
-cd "$WORKTREE_PATH"
+# 4. worktree 진입 및 검증
+cd "$WORK_PATH"
 [ "$(git branch --show-current)" = "$BRANCH_NAME" ] || echo "ERROR: worktree 진입 실패"
 ```
 
@@ -111,27 +94,21 @@ cd "$WORKTREE_PATH"
 **반드시 worktree에 진입하고 브랜치를 검증한 후** 다음 단계로 진행한다.
 이후 모든 작업(plan 작성, 파일 편집)은 worktree 안에서 수행한다.
 
-### Branch (gtr 미설치 시 fallback만)
-
-```bash
-git checkout -b "{BRANCH_NAME}"
-```
-
-### 이미 동일 브랜치의 worktree가 존재하는 경우
-
-`git worktree list`에서 해당 브랜치가 이미 보이면:
+**이미 동일 브랜치의 worktree가 존재하는 경우:**
 - AskUserQuestion: "이미 {BRANCH_NAME} worktree가 존재합니다. 해당 worktree를 사용할까요?"
 - 예 → 기존 worktree 경로로 cd
 - 아니오 → STOP
 
-## 6. Write Plan + State (worktree 안에서)
+## 4. Write Plan + State (workPath 안에서)
 
 **먼저 plans/ 디렉토리 생성:**
 ```bash
 mkdir -p plans/
 ```
 
-### 6a. Project Context 추출
+> plan·state 파일은 워크플로우 메타데이터다. **커밋에 포함하지 않는다.**
+
+### 4a. Project Context 추출
 
 프로젝트 CLAUDE.md는 Claude Code가 자동 로드하므로 이미 컨텍스트에 있다. 아래 값을 추출하여 state JSON에 저장한다:
 
@@ -148,7 +125,14 @@ mkdir -p plans/
    - 모노레포인 경우 작업 대상 패키지의 per-package CLAUDE.md에서 추출
    - 명령어를 찾을 수 없으면 → AskUserQuestion으로 사용자에게 직접 질문
 
-### 6b. State JSON — `plans/{identifier}.state.json`
+### 4b. Base Branch 감지
+
+```bash
+git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@'
+```
+출력이 있으면 그 값을 사용 (예: `main`, `develop`). 출력이 없으면 `"main"`을 기본값으로 사용.
+
+### 4c. State JSON — `plans/{identifier}.state.json`
 
 **가장 먼저 생성.** 모든 에이전트가 읽는 single source of truth.
 
@@ -156,37 +140,42 @@ Write 도구로 아래 JSON을 생성한다 (모든 필드를 채울 것):
 
 ```jsonc
 {
-  "identifier": "{jira-key 또는 slug}",
-  "jiraKey": "{JIRA-KEY}",              // standalone이면 null
-  "branchName": "{branch-name}",
-  "baseBranch": "{main 또는 develop 등}", // `git symbolic-ref refs/remotes/origin/HEAD`로 감지. 감지 실패 시 "main"
+  "identifier": "{slug}",
+  "workspace": "{main | worktree}",
+  "branchName": "{worktree 모드: identifier, main 모드: null}",
+  "baseBranch": "{4b에서 감지한 값}",
 
-  "worktreePath": "{worktree 절대 경로}",  // step 5에서 획득한 값
-  "mainRepoPath": "{main repo 절대 경로}", // step 5의 MAIN_REPO 값
-  "planFile": "{worktree 절대 경로}/plans/{identifier}.md",
+  "workPath": "{step 3에서 획득한 절대 경로}",
+  "planFile": "{workPath}/plans/{identifier}.md",
 
-  "projectType": "{backend | frontend | fullstack}",  // CLAUDE.md 또는 파일 감지로 판별
-  "techStack": "{프레임워크 / 언어}",                  // 예: "NestJS / TypeScript"
-  "commands": {                                        // CLAUDE.md ## Commands에서 추출
+  "projectType": "{backend | frontend | fullstack}",
+  "techStack": "{프레임워크 / 언어}",
+  "commands": {
     "lint": "{lint 명령어}",
     "build": "{build 명령어}",
     "test": "{test 명령어}"
   },
-  "workspace": "worktree",              // 또는 "branch"
 
   "currentPhase": "start",
   "gates": {
-    "planConfirmed": false,
-    "expertApproved": false,
-    "prConfirmed": false
+    "plan": false,
+    "review": false,
+    "finish": false
   },
 
   "expertReviews": {},
 
+  "attempts": {
+    "planFix": 0,
+    "implVerify": 0,
+    "codeFix": 0,
+    "doneVerify": 0
+  },
+
   "testDatabase": {
-    "name": null,                   // 테스트 전용 DB 이름 (impl/done에서 생성)
-    "url": null,                    // 치환된 DATABASE_URL
-    "type": null                    // postgresql | mysql | sqlite | mongodb
+    "name": null,
+    "url": null,
+    "type": null
   },
 
   "verification": {
@@ -201,45 +190,37 @@ Write 도구로 아래 JSON을 생성한다 (모든 필드를 채울 것):
     "number": null
   },
 
-  "createdAt": "{현재 ISO 8601}",
+  "createdAt": "{현재 ISO 8601 — date -u +%Y-%m-%dT%H:%M:%SZ}",
   "updatedAt": "{현재 ISO 8601}"
 }
 ```
 
-### 6c. Plan Markdown — `plans/{identifier}.md`
+### 4d. Plan Markdown — `plans/{identifier}.md`
 
 Write 도구로 사람이 읽는 플랜 문서를 생성한다. 포함할 내용:
 
-1. **Tracking** — Jira 링크 또는 브랜치명 (standalone)
+1. **Workspace** — 모드(main/worktree) + 브랜치명
 2. **Tech Stack** — 프로젝트 기술 스택 요약
-3. **Requirements** — step 2에서 정리한 요구사항 요약
+3. **Requirements** — step 1에서 정리한 요구사항 요약
 4. **Affected Layers** — CLAUDE.md의 아키텍처 정보 기반
 5. **Implementation Phases** (반드시 이 정확한 헤딩명 사용) — phase별 작업 항목 + 병렬/순차 표시 + 에이전트 배정 테이블
 6. **Risk Assessment** — 주의할 점, 의존성, 잠재 이슈
 7. **Status** — "Plan ready — proceed with `/orchestrate:review`"
 
-> 경로·키 등 메타데이터는 plan markdown에 중복 기재하지 않는다. State JSON이 single source of truth.
+> 경로 등 메타데이터는 plan markdown에 중복 기재하지 않는다. State JSON이 single source of truth.
 
-### 6d. Base Branch 감지
-
-state JSON의 `baseBranch` 필드를 채운다:
-```bash
-git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@'
-```
-출력이 있으면 그 값을 사용 (예: `main`, `develop`). 출력이 없으면 `"main"`을 기본값으로 사용.
-
-### 6e. Gate 1 — Plan Confirmation
+### 4e. Gate 1 — Plan Confirmation
 
 두 파일 작성 완료 후:
 1. 플랜의 핵심 요약(요구사항, phase 구조, 에이전트 배정)을 텍스트로 출력한다
 2. AskUserQuestion으로 확인: "플랜을 승인하고 expert review로 진행할까요?"
-   - 승인 → state 갱신 후 다음 phase 안내
+   - 승인 → state 갱신 후 다음 phase 진행
    - 수정 요청 → 사용자 피드백 반영 후 재확인
 
 사용자가 확인하면 → state JSON을 Read → 아래 필드 갱신 → Write:
 ```jsonc
 {
-  "gates": { "planConfirmed": true },
+  "gates": { "plan": true },
   "currentPhase": "review",
   "updatedAt": "{현재 ISO 8601}"
 }
@@ -250,12 +231,10 @@ git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/ori
 아래 조건이 **모두** 충족되어야 이 phase가 완료된 것이다:
 
 - [ ] 요구사항이 명확하게 정리됨
-- [ ] Worktree 생성 완료 + 현재 worktree 디렉토리 안에 위치
+- [ ] Workspace 확인 완료 — main 모드: repo 루트 + working tree 상태 확인 / worktree 모드: 생성 + 진입 + 브랜치 일치
 - [ ] `plans/{identifier}.state.json` 생성, 모든 필드 값이 채워짐
 - [ ] `plans/{identifier}.md` 작성, 구현 플랜 포함
-- [ ] Jira 이슈 확인 완료 (Jira mode인 경우)
 - [ ] Gate 1 통과 (사용자가 플랜 확인)
-- [ ] 검증: `pwd` = worktree 경로, `git branch --show-current` ≠ main
 
 > `/orchestrate`로 실행 중이면 자동으로 review phase로 진행한다.
 > 단독 실행(`/orchestrate:start`)이면 사용자에게 안내: `/orchestrate:review`

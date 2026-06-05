@@ -1,70 +1,74 @@
 {
-	"permissions": {
-		"allow": [
-			"Bash",
-			"Read",
-			"Edit(**)",
-			"Read(**)",
-			"Write(**)",
-			"Search(**)",
-			"mcp__filesystem__read_multiple_files",
-			"WebSearch",
-			"WebFetch(domain:github.com)",
-			"WebFetch(domain:tkdodo.eu)"
-		],
-		"deny": ["Bash(git reset*)", "Bash(git rebase*)", "Bash(rm -rf *)"]
-	},
-	"hooks": {
-		"Notification": [
-			{
-				"matcher": "permission_prompt",
-				"hooks": [
-					{
-						"type": "command",
-						"command": "~/.claude/hooks/notify-permission-prompt.sh"
-					}
-				]
-			},
-			{
-				"matcher": "idle_prompt",
-				"hooks": [
-					{
-						"type": "command",
-						"command": "~/.claude/hooks/notify-idle-prompt.sh"
-					}
-				]
-			},
-			{
-				"matcher": "auth_success",
-				"hooks": [
-					{
-						"type": "command",
-						"command": "~/.claude/hooks/notify-auth-success.sh"
-					}
-				]
-			},
-			{
-				"matcher": "elicitation_dialog",
-				"hooks": [
-					{
-						"type": "command",
-						"command": "~/.claude/hooks/notify-elicitation-dialog.sh"
-					}
-				]
-			}
-		]
-	},
-	"statusLine": {
-		"type": "command",
-		"command": "~/.claude/cc-chips/engine.sh"
-	},
-	"enabledPlugins": {
-		"superpowers@superpowers-marketplace": true
-	},
-	"effortLevel": "xhigh",
-	"skipDangerousModePermissionPrompt": true,
-	"theme": "dark-daltonized",
-	"editorMode": "vim",
-	"remoteControlAtStartup": true,
-	"agentPushNotifEnabled": true
+  "permissions": {
+    "allow": [
+      "Bash",
+      "Read",
+      "Edit(**)",
+      "Read(**)",
+      "Write(**)",
+      "Search(**)",
+      "mcp__filesystem__read_multiple_files",
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:tkdodo.eu)"
+    ],
+    "deny": [
+      "Bash(git reset*)",
+      "Bash(rm -rf *)"
+    ]
+  },
+  "hooks": {
+    "Notification": [
+      {
+        "matcher": "permission_prompt",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/notify-permission-prompt.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "idle_prompt",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/notify-idle-prompt.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "auth_success",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/notify-auth-success.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "elicitation_dialog",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/notify-elicitation-dialog.sh"
+          }
+        ]
+      }
+    ]
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "~/.claude/cc-chips/engine.sh"
+  },
+  "enabledPlugins": {
+    "superpowers@superpowers-marketplace": true
+  },
+  "effortLevel": "xhigh",
+  "skipDangerousModePermissionPrompt": true,
+  "theme": "dark-daltonized",
+  "editorMode": "vim",
+  "remoteControlAtStartup": true,
+  "agentPushNotifEnabled": true,
+  "tui": "fullscreen"
 }

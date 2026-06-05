@@ -209,6 +209,12 @@ main 모드에서는 gtr을 사용하지 않는다.
 개별 sub-command 실행 시에는 해당 phase만 수행하고 종료한다 (자동 연속 실행 아님).
 모든 재개 컨텍스트는 state JSON에서 로드한다.
 
+## Cleanup (산출물 정리)
+
+완료·중단된 워크플로우의 산출물은 `/orchestrate:cleanup`으로 일괄 정리한다 — worktree, 로컬·원격 브랜치, plan·state 파일, 테스트 DB.
+state 파일 기반으로 대상을 발견하고, 안전성 검사(미커밋 변경·미push 커밋·OPEN PR) 후 **미리보기 + 승인을 거쳐서만 삭제**한다.
+상세: `~/.claude/commands/orchestrate/cleanup.md` (파이프라인 phase 아님 — 단독 실행)
+
 ## Output Language
 
 사용자 facing 출력은 **한국어**를 기본으로 한다.

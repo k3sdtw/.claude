@@ -212,8 +212,8 @@ state.json의 `testDatabase` 필드가 존재하면 `rules/common/test-db-isolat
    - worktree 모드: PR URL + 제목 + 브랜치명
 3. **Test DB Cleanup**: 삭제한 DB 이름 + 결과 (성공/실패)
 4. **Cleanup 안내** (실행은 하지 않음, 사용자가 직접 결정):
-   - 공통: `plans/{identifier}.md`, `plans/{identifier}.state.json`은 untracked로 남아있음 — 보관 또는 삭제
-   - worktree 모드: PR merge 후 `git gtr rm {branchName} --delete-branch` (반드시 `git gtr`로 실행)
+   - `/orchestrate:cleanup`으로 일괄 정리 — worktree, 로컬·원격 브랜치, plan·state 파일, 테스트 DB (미리보기 + 승인 후 삭제)
+   - worktree 모드는 PR merge 후 정리 권장
 
 ## Done Criteria
 

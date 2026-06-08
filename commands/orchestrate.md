@@ -149,7 +149,7 @@ main 모드에서는 gtr을 사용하지 않는다.
 4. **gtr 실행 형식** — 항상 `git gtr ...` 형태로 호출. `gtr ...`로 직접 호출 금지
 5. 모든 phase는 state의 `workPath` 안에서 실행한다
 6. Gate를 사용자 승인 없이 건너뛰지 않는다
-7. Expert review·impl 에이전트는 반드시 병렬 실행한다 — **Workflow 도구 우선**, 미지원 시 Task 병렬 (각 sub-command 파일 참조)
+7. Expert review·impl 에이전트는 반드시 병렬 실행한다 — review는 **Task 병렬**, impl은 **Workflow**(phase barrier·resume 필요 시). 각 sub-command 파일 참조. Workflow 스크립트 작성 규칙: [rules/common/workflow-authoring.md](../rules/common/workflow-authoring.md)
 8. **State JSON이 권위적 소스** — 에이전트는 state JSON에서 읽되, plan markdown을 파싱하지 않는다
 9. **main 모드에서는 push·PR을 자동 실행하지 않는다** — commit까지만 하고 push는 사용자에게 안내한다
 10. **동시 워크플로우 최대 2개** — 모든 세션이 하나의 usage limit을 공유한다. start phase에서 `plans/*.state.json` 중 진행 중(currentPhase ≠ "completed")인 워크플로우가 이미 2개 이상이면 사용자에게 경고하고, 기존 워크플로우 완료 후 순차 시작을 권고한다. 다른 worktree·레포에서 병렬 실행 중인 세션은 감지할 수 없으므로 사용자에게 한 번 확인한다

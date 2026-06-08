@@ -83,9 +83,12 @@ ux-reviewer는 프론트엔드 관점의 리뷰 포커스를 그대로 유지한
 
 ## 4. Launch Reviews (병렬)
 
-선택된 그룹의 **모든 에이전트를 동시에** 실행한다. **Workflow 도구 우선**(4b), 미지원·권한 거부 시 Task 병렬 fallback(4c).
+선택된 그룹의 **모든 에이전트를 한 메시지에서 동시에** Task 도구로 실행한다.
 
-> 이 스킬의 지시에 의한 Workflow 호출이므로 multi-agent orchestration opt-in 조건을 충족한다.
+> 단일 fan-out(N명 리뷰 → 결과 집계)이라 Workflow 스크립트가 필요 없다 — Task 병렬이 더 단순하고
+> 샌드박스 제약(결정성·args 직렬화 등)에서 자유롭다. 구조화 출력은 프롬프트로 강제한다
+> ([rules/common/workflow-authoring.md](../../rules/common/workflow-authoring.md) 참조).
+> 이 스킬의 지시에 의한 병렬 에이전트 실행이므로 multi-agent orchestration opt-in 조건을 충족한다.
 
 ### 4a. 에이전트 프롬프트 (공통)
 
@@ -107,7 +110,7 @@ ux-reviewer는 프론트엔드 관점의 리뷰 포커스를 그대로 유지한
 {REACT_SKILL_BLOCK}
 ```
 
-> 출력 형식은 실행 경로가 결정한다 — Workflow(4b)는 schema가 강제하므로 프롬프트에 넣지 않고, Task(4c)는 JSON 형식 블록을 덧붙인다.
+> 출력 형식(4b의 JSON 블록)을 이 프롬프트 끝에 덧붙여 구조화 출력을 강제한다.
 
 **조건부 삽입: `{REACT_SKILL_BLOCK}`**
 
@@ -127,78 +130,13 @@ React 프로젝트(Section 3 감지 조건 참조)이고 해당 에이전트가 
    - [HIGH] async-parallel 위반: 독립적인 fetch가 순차 실행됨 → Promise.all()로 병렬화 권고
 ```
 
-### 4b. Workflow 실행 (기본)
+### 4b. 실행 + 출력 형식
 
-Workflow 도구에 아래 스크립트를 inline `script`로 전달해 실행한다.
-schema가 출력 구조를 강제하므로 **프롬프트에 출력 형식을 넣지 않는다.**
+각 에이전트를 **한 메시지에서 동시에** Task 도구로 띄운다 (`subagent_type` = 그룹 테이블의 agent 이름).
+각 에이전트의 JSON 출력을 파싱해 Section 5에서 severity별로 집계한다.
+수정 후 일부 에이전트만 재실행할 때는 해당 에이전트의 Task만 다시 띄운다.
 
-> **중요 — `args`를 쓰지 않는다.** reviewer 목록은 Workflow의 `args`로 넘기지 말고
-> **스크립트 본문에 `reviewers` 배열 리터럴로 직접 인라인**한다. `args`로 전달하면
-> 직렬화 과정에서 문자열로 도달해 `args.reviewers.map`이 `undefined`로 터진다(실제 발생 사례).
-> 스크립트를 self-contained로 만들면 이 전송 계층 자체가 사라진다.
-
-**스크립트 작성 방법:**
-1. 선택된 그룹의 각 에이전트에 대해 4a 템플릿을 채운 전문 프롬프트를 만든다.
-2. 각 프롬프트를 백틱(`` ` ``) 템플릿 리터럴로 감싸 아래 `reviewers` 배열에 넣는다.
-   프롬프트 안에 백틱·`${`·백슬래시가 있으면 escape 한다 (`` \` `` · `\${` · `\\`).
-3. `const reviewers = [...]` 부분을 채워 inline `script`로 전달한다.
-
-**script:**
-
-```javascript
-export const meta = {
-  name: 'orchestrate-review',
-  description: '플랜 expert review — agent group 병렬 실행, 구조화된 findings 반환',
-  phases: [{ title: 'Review' }],
-}
-
-// 선택된 그룹의 에이전트를 여기에 직접 인라인한다 (args 사용 금지).
-// prompt 는 4a 템플릿을 채운 전문. 백틱·${ }·백슬래시는 escape.
-const reviewers = [
-  { agentType: 'architect', prompt: `{4a 템플릿을 채운 전문}` },
-  { agentType: 'security-reviewer', prompt: `...` },
-  // ... 선택된 그룹의 모든 에이전트
-]
-
-const FINDINGS = {
-  type: 'object',
-  required: ['agent', 'findings'],
-  properties: {
-    agent: { type: 'string' },
-    findings: {
-      type: 'array',
-      items: {
-        type: 'object',
-        required: ['severity', 'finding', 'recommendation'],
-        properties: {
-          severity: { type: 'string', enum: ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'] },
-          finding: { type: 'string' },
-          recommendation: { type: 'string' },
-          file: { type: 'string' }
-        }
-      }
-    }
-  }
-}
-phase('Review')
-const results = await parallel(reviewers.map(r => () =>
-  agent(r.prompt, { label: 'review:' + r.agentType, agentType: r.agentType, schema: FINDINGS })
-))
-const reviews = results.filter(Boolean)
-const all = reviews.flatMap(r => r.findings)
-log(reviews.length + '/' + reviewers.length + ' reviews, ' + all.length + ' findings')
-return {
-  reviews,
-  criticalOrHigh: all.filter(f => f.severity === 'CRITICAL' || f.severity === 'HIGH')
-}
-```
-
-반환값의 `reviews`(에이전트별 findings)와 `criticalOrHigh`를 Section 5에서 사용한다.
-수정 후 일부 에이전트만 재실행할 때는 `reviewers` 배열에 해당 에이전트만 남겨 스크립트를 다시 작성해 호출한다.
-
-### 4c. Task fallback (Workflow 미지원·거부 시)
-
-모든 에이전트를 동시에 Task 도구로 실행한다. 4a 프롬프트 끝에 아래 출력 형식을 덧붙인다:
+4a 프롬프트 끝에 아래 출력 형식을 덧붙여 구조화 출력을 강제한다:
 
 ```
 ## 출력 형식

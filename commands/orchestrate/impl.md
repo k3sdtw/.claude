@@ -78,18 +78,17 @@ state JSON의 `planFile` 경로를 Read 도구로 읽는다.
 
 ### 3b. Workflow 실행 (기본)
 
-플랜의 Implementation Phases를 그대로 스크립트 본문의 `phases` 배열에 인라인한다. **phase 간 순차, phase 내 병렬**이 스크립트 코드로 보장된다.
+이 단계는 phase 간 순차 barrier·resume이 실제로 필요해 Workflow를 쓴다(review와 달리 단순 fan-out이 아님). **phase 간 순차, phase 내 병렬**이 스크립트 코드로 보장된다.
 
-> **중요 — `args`를 쓰지 않는다.** phase 목록은 Workflow의 `args`로 넘기지 말고
-> **스크립트 본문에 `phases` 배열 리터럴로 직접 인라인**한다. `args`로 전달하면
-> 직렬화 과정에서 문자열로 도달해 `args.phases`가 `undefined`로 터진다(review.md에서 실제 발생).
-> 스크립트를 self-contained로 만들면 이 전송 계층 자체가 사라진다.
+> **작성 원칙 (필독): 로직은 고정, 데이터만 채운다.** 아래 스크립트의 `meta`·`REPORT`·orchestration·`return`은
+> **그대로 복사**하고, 표시된 `const phases = [...]` **데이터 블록 1곳만** 채운다. 데이터 블록엔 **순수 리터럴만** —
+> 함수 호출·표현식·`Date.now()`·`new Date()`·`Math.random()` 금지(샌드박스에서 throw). 이 원칙 하나가 모든 제약을 포함한다.
+> 전체 규칙: [rules/common/workflow-authoring.md](../../rules/common/workflow-authoring.md).
 
-**스크립트 작성 방법:**
+**`phases` 데이터 블록 채우는 법:**
 1. 각 phase·에이전트에 대해 3a 템플릿을 채운 전문 프롬프트를 만든다.
-2. 각 프롬프트를 백틱(`` ` ``) 템플릿 리터럴로 감싸 `phases` 배열에 넣는다.
-   프롬프트 안에 백틱·`${`·백슬래시가 있으면 escape 한다 (`` \` `` · `\${` · `\\`).
-3. `const phases = [...]` 부분을 채워 inline `script`로 전달한다.
+2. 각 프롬프트를 백틱(`` ` ``) **정적** 템플릿 리터럴로 감싼다(보간 `${` 금지·escape).
+3. `name`·`area`·`prompt`만 채운다. 그 외 코드는 건드리지 않는다.
 
 **script:**
 
@@ -99,8 +98,8 @@ export const meta = {
   description: '플랜 phase 순서대로 구현 — phase 간 순차, phase 내 병렬',
 }
 
-// 플랜의 Implementation Phases를 여기에 직접 인라인한다 (args 사용 금지).
-// prompt 는 3a 템플릿을 채운 전문. 백틱·${ }·백슬래시는 escape.
+// ▼▼▼ FILL: 데이터 블록 — 여기만 채운다 (순수 리터럴 / 로직·Date·random 금지) ▼▼▼
+// prompt 는 3a 템플릿을 채운 정적 문자열. 보간 ${ } 금지.
 const phases = [
   {
     name: 'A',
@@ -111,6 +110,7 @@ const phases = [
   },
   { name: 'B', agents: [ /* ... */ ] },
 ]
+// ▲▲▲ FILL 끝 — 아래 코드는 그대로 복사, 수정 금지 ▲▲▲
 
 const REPORT = {
   type: 'object',

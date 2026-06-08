@@ -132,17 +132,16 @@ React 프로젝트(Section 3 감지 조건 참조)이고 해당 에이전트가 
 Workflow 도구에 아래 스크립트를 inline `script`로 전달해 실행한다.
 schema가 출력 구조를 강제하므로 **프롬프트에 출력 형식을 넣지 않는다.**
 
-**args** — 4a 템플릿을 채운 전문을 에이전트별로 전달 (실제 JSON 값으로, 문자열 인코딩 금지):
+> **중요 — `args`를 쓰지 않는다.** reviewer 목록은 Workflow의 `args`로 넘기지 말고
+> **스크립트 본문에 `reviewers` 배열 리터럴로 직접 인라인**한다. `args`로 전달하면
+> 직렬화 과정에서 문자열로 도달해 `args.reviewers.map`이 `undefined`로 터진다(실제 발생 사례).
+> 스크립트를 self-contained로 만들면 이 전송 계층 자체가 사라진다.
 
-```jsonc
-{
-  "reviewers": [
-    { "agentType": "architect", "prompt": "{4a 템플릿을 채운 전문}" },
-    { "agentType": "security-reviewer", "prompt": "..." }
-    // ... 선택된 그룹의 모든 에이전트
-  ]
-}
-```
+**스크립트 작성 방법:**
+1. 선택된 그룹의 각 에이전트에 대해 4a 템플릿을 채운 전문 프롬프트를 만든다.
+2. 각 프롬프트를 백틱(`` ` ``) 템플릿 리터럴로 감싸 아래 `reviewers` 배열에 넣는다.
+   프롬프트 안에 백틱·`${`·백슬래시가 있으면 escape 한다 (`` \` `` · `\${` · `\\`).
+3. `const reviewers = [...]` 부분을 채워 inline `script`로 전달한다.
 
 **script:**
 
@@ -152,6 +151,15 @@ export const meta = {
   description: '플랜 expert review — agent group 병렬 실행, 구조화된 findings 반환',
   phases: [{ title: 'Review' }],
 }
+
+// 선택된 그룹의 에이전트를 여기에 직접 인라인한다 (args 사용 금지).
+// prompt 는 4a 템플릿을 채운 전문. 백틱·${ }·백슬래시는 escape.
+const reviewers = [
+  { agentType: 'architect', prompt: `{4a 템플릿을 채운 전문}` },
+  { agentType: 'security-reviewer', prompt: `...` },
+  // ... 선택된 그룹의 모든 에이전트
+]
+
 const FINDINGS = {
   type: 'object',
   required: ['agent', 'findings'],
@@ -173,12 +181,12 @@ const FINDINGS = {
   }
 }
 phase('Review')
-const results = await parallel(args.reviewers.map(r => () =>
+const results = await parallel(reviewers.map(r => () =>
   agent(r.prompt, { label: 'review:' + r.agentType, agentType: r.agentType, schema: FINDINGS })
 ))
 const reviews = results.filter(Boolean)
 const all = reviews.flatMap(r => r.findings)
-log(reviews.length + '/' + args.reviewers.length + ' reviews, ' + all.length + ' findings')
+log(reviews.length + '/' + reviewers.length + ' reviews, ' + all.length + ' findings')
 return {
   reviews,
   criticalOrHigh: all.filter(f => f.severity === 'CRITICAL' || f.severity === 'HIGH')
@@ -186,7 +194,7 @@ return {
 ```
 
 반환값의 `reviews`(에이전트별 findings)와 `criticalOrHigh`를 Section 5에서 사용한다.
-수정 후 일부 에이전트만 재실행할 때는 `reviewers`에 해당 에이전트만 담아 재호출한다.
+수정 후 일부 에이전트만 재실행할 때는 `reviewers` 배열에 해당 에이전트만 남겨 스크립트를 다시 작성해 호출한다.
 
 ### 4c. Task fallback (Workflow 미지원·거부 시)
 

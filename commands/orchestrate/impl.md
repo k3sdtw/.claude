@@ -78,24 +78,18 @@ state JSON의 `planFile` 경로를 Read 도구로 읽는다.
 
 ### 3b. Workflow 실행 (기본)
 
-플랜의 Implementation Phases를 그대로 args로 옮긴다. **phase 간 순차, phase 내 병렬**이 스크립트 코드로 보장된다.
+플랜의 Implementation Phases를 그대로 스크립트 본문의 `phases` 배열에 인라인한다. **phase 간 순차, phase 내 병렬**이 스크립트 코드로 보장된다.
 
-**args** (실제 JSON 값으로, 문자열 인코딩 금지):
+> **중요 — `args`를 쓰지 않는다.** phase 목록은 Workflow의 `args`로 넘기지 말고
+> **스크립트 본문에 `phases` 배열 리터럴로 직접 인라인**한다. `args`로 전달하면
+> 직렬화 과정에서 문자열로 도달해 `args.phases`가 `undefined`로 터진다(review.md에서 실제 발생).
+> 스크립트를 self-contained로 만들면 이 전송 계층 자체가 사라진다.
 
-```jsonc
-{
-  "phases": [
-    {
-      "name": "A",
-      "agents": [
-        { "area": "domain", "prompt": "{3a 템플릿을 채운 전문}" },
-        { "area": "infra", "prompt": "..." }
-      ]
-    },
-    { "name": "B", "agents": [ /* ... */ ] }
-  ]
-}
-```
+**스크립트 작성 방법:**
+1. 각 phase·에이전트에 대해 3a 템플릿을 채운 전문 프롬프트를 만든다.
+2. 각 프롬프트를 백틱(`` ` ``) 템플릿 리터럴로 감싸 `phases` 배열에 넣는다.
+   프롬프트 안에 백틱·`${`·백슬래시가 있으면 escape 한다 (`` \` `` · `\${` · `\\`).
+3. `const phases = [...]` 부분을 채워 inline `script`로 전달한다.
 
 **script:**
 
@@ -104,6 +98,20 @@ export const meta = {
   name: 'orchestrate-impl',
   description: '플랜 phase 순서대로 구현 — phase 간 순차, phase 내 병렬',
 }
+
+// 플랜의 Implementation Phases를 여기에 직접 인라인한다 (args 사용 금지).
+// prompt 는 3a 템플릿을 채운 전문. 백틱·${ }·백슬래시는 escape.
+const phases = [
+  {
+    name: 'A',
+    agents: [
+      { area: 'domain', prompt: `{3a 템플릿을 채운 전문}` },
+      { area: 'infra', prompt: `...` },
+    ],
+  },
+  { name: 'B', agents: [ /* ... */ ] },
+]
+
 const REPORT = {
   type: 'object',
   required: ['files', 'summary'],
@@ -113,7 +121,7 @@ const REPORT = {
   }
 }
 const done = []
-for (const p of args.phases) {
+for (const p of phases) {
   log('Phase ' + p.name + ': agents ' + p.agents.length)
   const results = await parallel(p.agents.map(a => () =>
     agent(a.prompt, { label: 'impl:' + a.area, phase: p.name, schema: REPORT, model: 'sonnet' })

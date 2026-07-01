@@ -17,7 +17,7 @@ Prerequisite: `/orchestrate:start`에서 플랜 작성 완료 + Gate 1 통과.
 2. **State 읽기**: Read 도구로 state.json을 읽고 JSON 파싱
 3. **작업 디렉토리 전환**: `workPath` 디렉토리 존재 확인 후 Bash `cd {workPath}` 실행 → 없으면 STOP. 이후 모든 명령은 이 디렉토리에서 실행
 4. **브랜치 확인** (worktree 모드만): `git branch --show-current`가 `branchName`과 일치하는지 확인 → 불일치 시 STOP. main 모드는 생략
-5. **필드 추출**: workspace, projectType, techStack, commands, planFile, branchName, baseBranch 등 필요한 값 보관
+5. **필드 추출**: workspace, **autonomy**, projectType, techStack, commands, planFile, branchName, baseBranch 등 필요한 값 보관
 6. **Phase 갱신**: state의 `currentPhase`를 `"review"`로, `updatedAt`을 현재 시각으로 갱신 → Write로 저장
 
 ## 1. Read Plan
@@ -157,8 +157,8 @@ React 프로젝트(Section 3 감지 조건 참조)이고 해당 에이전트가 
 | 조건 | 행동 |
 |------|------|
 | CRITICAL 또는 HIGH 발견 | `attempts.planFix` +1 → state Write → 플랜 수정·수정 내역 보고 → **해당 에이전트만** 재실행 |
-| MEDIUM 이하만 | 사용자에게 보고 후 진행 여부 확인 |
-| `attempts.planFix` = 2인데 CRITICAL 잔존 | STOP: 사용자에게 수동 판단 요청 |
+| MEDIUM 이하만 | **자율 모드**: 보고만 하고 자동 진행 · **게이트 모드**: 사용자에게 보고 후 진행 여부 확인 |
+| `attempts.planFix` = 2인데 CRITICAL 잔존 | STOP: 사용자에게 수동 판단 요청 (자율 모드도 [에스컬레이션 조건](../orchestrate.md#autonomy-mode-게이트-자동-통과-vs-승인) 6번으로 멈춤) |
 
 > 카운터는 state에 영속된다 — 세션이 끊겨도 한도가 유지된다.
 
@@ -185,9 +185,12 @@ state JSON을 Read → 아래 필드 갱신 → Write:
 
 ## GATE 2: Expert Approval
 
-**STOP.** 리뷰 결과 요약을 보여주고 사용자에게 확인을 요청한다.
+**`autonomy` 값에 따라 분기**한다:
 
-사용자가 확인하면 → state JSON을 Read → 아래 필드 갱신 → Write:
+- **자율 모드 (`auto`)**: 리뷰 결과 요약을 출력하고 **자동 통과**한다 (모든 CRITICAL/HIGH가 해소된 경우). 미해소 CRITICAL/HIGH가 남았으면 [에스컬레이션 조건](../orchestrate.md#autonomy-mode-게이트-자동-통과-vs-승인) 6번에 따라 멈추고 질문한다.
+- **게이트 모드 (`gated`)**: **STOP.** 리뷰 결과 요약을 보여주고 사용자에게 확인을 요청한다.
+
+통과(자동 또는 확인)하면 → state JSON을 Read → 아래 필드 갱신 → Write:
 ```jsonc
 {
   "gates": { "review": true },

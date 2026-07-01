@@ -27,8 +27,8 @@ E2E pipeline: requirements → workspace → plan → expert review → implemen
 
 | Input | Mode |
 |-------|------|
-| (기본 — 플래그 없음) | **main** — 현재 체크아웃(main 브랜치)에서 직접 개발. 워크스페이스를 만들지 않는다 |
-| `--worktree` flag | **worktree** — gtr로 격리된 worktree를 만들고 그 안에서 개발 |
+| (기본 — 플래그 없음) | **worktree** — gtr로 격리된 worktree를 만들고 그 안에서 개발 |
+| `--main` flag | **main** — 현재 체크아웃(main 브랜치)에서 직접 개발. 워크스페이스를 만들지 않는다 |
 
 | | main 모드 | worktree 모드 |
 |---|----------|---------------|
@@ -36,6 +36,42 @@ E2E pipeline: requirements → workspace → plan → expert review → implemen
 | 브랜치 | 현재 브랜치 그대로 (보통 main) | `{identifier}` feature 브랜치 |
 | 마무리 | **commit까지만** — push는 사용자가 직접 | commit → push → **PR 생성** |
 | gtr 미설치 시 | 무관 | **STOP** — 설치 안내 |
+
+## Autonomy Mode (게이트 자동 통과 vs 승인)
+
+**기본은 자율 모드다.** 게이트(Gate 1·2·3)에서 사용자 승인을 받지 않고 자동으로 다음 phase로 진행하며, PR 생성까지 무인으로 완료한다. 단 아래 **에스컬레이션 조건**에 하나라도 해당하면 즉시 멈추고 AskUserQuestion으로 사용자 판단을 받는다.
+
+### 모드 결정 (start phase에서 확정 → state의 `autonomy`에 기록)
+
+| 입력 | workspace | autonomy | 동작 |
+|------|-----------|----------|------|
+| (플래그 없음) | worktree | `auto` | **기본** — Gate 1·2·3 자동 통과 → push → PR. 에스컬레이션 조건만 질문 |
+| `--gated` | worktree | `gated` | 각 게이트에서 승인 요청 |
+| `--main` | main | `gated` | **자율 모드는 worktree 전용.** 게이트 승인 방식 + commit까지만 |
+| `--main --gated` | main | `gated` | 동일 — 게이트 승인 방식 |
+
+> **자율 모드는 worktree 전용이다.** main 모드는 실제 main/master에 직접 commit될 수 있어([safety.md](../rules/devops/safety.md) §4) 자율 커밋을 허용하지 않는다. `--main`으로 실행하면 게이트 승인 방식으로 진행하고, 무인 진행이 필요하면 플래그 없이(기본 worktree) 실행하도록 안내한다.
+
+### 에스컬레이션 조건 (자율 모드에서도 반드시 멈추고 질문)
+
+원칙: **"조금이라도 애매하거나 중대하면 묻는다."** 무리하게 추론해서 진행하지 않는다. 자율 모드라도 아래 중 하나라도 발생하면 AskUserQuestion으로 사용자에게 판단을 받고, 답을 반영한 뒤 자율 진행을 재개한다.
+
+1. **요구사항 애매성** — 필수 스펙이 없거나 여러 해석이 가능하고, 그 차이가 구현을 실질적으로 바꾸는 경우. start Q&A에서 합리적으로 추론 불가한 항목.
+2. **데이터 손실·비가역 변경** — 파괴적 마이그레이션(컬럼/테이블 drop, 데이터 유실형 타입 변경), 기존 데이터 삭제·덮어쓰기, 되돌리기 어려운 외부 부수효과.
+3. **보안 민감 결정** — auth/authz 변경, 엔드포인트 공개(public) 전환, 시크릿 취급, 권한 상승 경로.
+4. **호환성 파괴** — 기존 소비자에 영향을 주는 API 계약·스키마 breaking change.
+5. **스코프 급증** — 플랜이 요청 범위를 크게 벗어나 커지는 경우.
+6. **자동 해소 한도 초과** — expert review CRITICAL/HIGH가 `attempts` 한도 내에 해소되지 않거나, verification이 한도 내에 통과하지 못하는 경우 (기존 STOP 규칙 유지).
+
+### 게이트·확인 지점별 처리
+
+| 지점 | 자율 모드 (`auto`) | 게이트 모드 (`gated`) |
+|------|-------------------|----------------------|
+| Gate 1 (플랜) | 요약 출력 후 자동 통과 (요구사항 애매성 없을 때) | 승인 요청 |
+| Gate 2 (리뷰) | 자동 통과 (CRITICAL/HIGH 해소 시) | 승인 요청 |
+| Gate 3 (ship) | 자동 통과 → push + PR | 승인 요청 |
+| MEDIUM/LOW findings | 보고만 하고 자동 진행 | 진행 여부 확인 |
+| phase 경계 `/compact` | 요청하지 않고 자동 진행 (컨텍스트는 state에 영속되어 안전) | 요청 후 대기 |
 
 ## State Management
 
@@ -69,6 +105,7 @@ E2E pipeline: requirements → workspace → plan → expert review → implemen
   },
 
   "currentPhase": "start",             // "start" → "review" → "impl" → "done" → "completed"
+  "autonomy": "auto",                  // "auto"(worktree 기본 — 게이트 자동 통과) 또는 "gated"(각 게이트 승인). main 모드는 항상 "gated"
   "gates": {
     "plan": false,                     // Gate 1: 플랜 승인
     "review": false,                   // Gate 2: expert review 승인
@@ -144,11 +181,11 @@ main 모드에서는 gtr을 사용하지 않는다.
 ## Mandatory Rules
 
 1. 반드시 프로젝트 컨텍스트를 먼저 파악한다 (CLAUDE.md 기반)
-2. **기본은 main 모드** — 현재 체크아웃에서 직접 개발하고, 워크스페이스를 만들지 않는다
-3. `--worktree` 플래그가 있을 때만 worktree를 생성한다. gtr 미설치면 STOP하고 설치를 안내한다
+2. **기본은 worktree 모드 + 자율 진행** — 격리된 worktree에서 무인으로 개발하고 PR까지 생성한다. gtr 미설치면 STOP하고 설치를 안내한다
+3. `--main` 플래그가 있을 때만 main 모드(현재 체크아웃에서 직접 개발, commit까지)로 진행한다. main 모드는 항상 게이트 승인 방식이다
 4. **gtr 실행 형식** — 항상 `git gtr ...` 형태로 호출. `gtr ...`로 직접 호출 금지
 5. 모든 phase는 state의 `workPath` 안에서 실행한다
-6. Gate를 사용자 승인 없이 건너뛰지 않는다
+6. **게이트 모드(`gated`)에서는** Gate를 사용자 승인 없이 건너뛰지 않는다. **자율 모드(`auto`, worktree 전용)에서는** Gate를 자동 통과하되, [Autonomy Mode](#autonomy-mode-게이트-자동-통과-vs-승인)의 에스컬레이션 조건에 하나라도 해당하면 반드시 멈추고 AskUserQuestion으로 질문한다
 7. Expert review·impl 에이전트는 반드시 병렬 실행한다 — review는 **Task 병렬**, impl은 **Workflow**(phase barrier·resume 필요 시). 각 sub-command 파일 참조. Workflow 스크립트 작성 규칙: [rules/common/workflow-authoring.md](../rules/common/workflow-authoring.md)
 8. **State JSON이 권위적 소스** — 에이전트는 state JSON에서 읽되, plan markdown을 파싱하지 않는다
 9. **main 모드에서는 push·PR을 자동 실행하지 않는다** — commit까지만 하고 push는 사용자에게 안내한다
@@ -191,10 +228,10 @@ main 모드에서는 gtr을 사용하지 않는다.
 ### 자동 진행 규칙
 
 1. 각 phase 파일의 지침을 **끝까지** 수행한다
-2. Gate에서 사용자 확인을 받으면 **즉시 다음 phase 파일을 Read하여 실행**한다
+2. **자율 모드(`auto`)**: Gate를 자동 통과하면 **즉시 다음 phase 파일을 Read하여 실행**한다. **게이트 모드(`gated`)**: Gate에서 사용자 확인을 받은 뒤 즉시 다음 phase 파일을 실행한다. 어느 모드든 에스컬레이션 조건에 걸리면 멈추고 질문한다
 3. sub-command 파일 끝의 `→ 다음: /orchestrate:xxx` 안내는 **무시**한다 — 자동으로 진행한다
 4. 어떤 phase에서든 STOP이 발생하면 전체 워크플로우를 중단하고 사용자에게 보고한다
-5. **Phase 경계 compact (필수)** — 각 phase 완료 후, 다음 phase 파일을 Read하기 **전에** 사용자에게 `/compact` 실행을 요청하고 대기한다. Gate가 있는 경계(start→review, review→impl, done의 Gate 3)는 Gate 승인 메시지에 compact 요청을 함께 포함하고, Gate가 없는 경계(impl→done)도 verification 통과 보고 시 동일하게 요청한다. 재개 컨텍스트는 모두 state JSON에 영속되므로 압축해도 안전하다. 사용자가 compact를 건너뛰겠다고 명시한 경우에만 생략한다
+5. **Phase 경계 compact** — **자율 모드(`auto`)에서는 compact를 요청하지 않고 자동 진행한다** (재개 컨텍스트는 모두 state JSON에 영속되므로 안전 — 무인 진행이 목적). **게이트 모드(`gated`)에서만** 각 phase 완료 후 다음 phase 파일을 Read하기 전에 `/compact` 실행을 요청하고 대기한다 (Gate 경계는 승인 메시지에 함께 포함, Gate 없는 경계(impl→done)는 verification 통과 보고 시 요청). 사용자가 건너뛰겠다고 명시하면 생략한다
 
 ## Resuming Mid-Workflow (개별 sub-command)
 
@@ -223,6 +260,7 @@ state 파일 기반으로 대상을 발견하고, 안전성 검사(미커밋 변
 ## Examples
 
 ```
-/orchestrate add dashboard page                       # main 모드 (기본) — main에서 직접 개발, commit까지
-/orchestrate --worktree add voucher notification      # worktree 모드 — 격리 개발 + PR 생성
+/orchestrate add voucher notification                  # worktree + 자율 모드 (기본) — 무인 진행 → PR. 애매/중대 사항만 질문
+/orchestrate --gated add voucher                       # worktree + 게이트 모드 — 각 게이트에서 승인 요청
+/orchestrate --main add dashboard page                 # main 모드 — 자율 불가(worktree 전용), 게이트 승인 방식 + commit까지
 ```

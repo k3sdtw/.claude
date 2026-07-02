@@ -1,5 +1,13 @@
 # CLAUDE.md
 
+## 답변 언어 (MOST IMPORTANT)
+
+**IMPORTANT: 사용자에게 보이는 모든 답변은 반드시 한국어로 작성한다.** 영어로 답변하지 않는다.
+
+- 예외(원문 유지): 코드·식별자·명령어·파일 경로·로그/에러 메시지 원문·고유명사·기술 용어.
+- 위 예외를 제외한 설명·요약·질문·제안은 전부 한국어로 쓴다.
+- 이 규칙은 다른 모든 지침보다 우선한다.
+
 ## When writing the code (IMPORTANT) 
 
 - Do not use abstract words for all function names, variable names. (e.g. Info, Data, Item etc..)

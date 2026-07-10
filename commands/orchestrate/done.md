@@ -127,15 +127,15 @@ git status
 git add {구현된 파일들만 개별 지정}
 
 # 3. 커밋 (프로젝트의 .claude/rules/git-workflow.md 또는 CLAUDE.md의 commit convention을 따름)
+#    Claude/AI를 Co-Author·contributor로 넣지 않는다 — Co-Authored-By 트레일러를 추가하지 않는다.
 git commit -m "$(cat <<'EOF'
 {type}({scope}): {description}
-
-Co-Authored-By: Claude <noreply@anthropic.com>
 EOF
 )"
 ```
 
 > commit format은 프로젝트의 `.claude/rules/git-workflow.md` 또는 CLAUDE.md의 convention을 따른다. 규칙이 없으면 `"type(scope): description"` 형식을 기본으로 사용.
+> **Claude/AI 계정을 커밋 contributor로 포함하지 않는다** — `Co-Authored-By: Claude ...` 트레일러를 넣지 않는다. 프로젝트 convention이 co-author 트레일러를 요구하더라도 AI 계정은 제외하고 사람 기여자만 남긴다.
 
 ## 4. Ship
 
@@ -158,7 +158,9 @@ state JSON을 Read → 아래 필드 갱신 → Write:
 git push -u origin {branchName}
 
 # 2. PR 생성 — rules/common/pull-request.md 템플릿을 따름
-gh pr create --base {baseBranch} --title "{type}({scope}): {description}" --body "$(cat <<'EOF'
+#    --assignee @me: 본인을 담당자로 지정해 GitHub 알림을 받는다.
+#    (PR 작성자는 자신을 reviewer로 요청할 수 없으므로 reviewer 대신 assignee 사용)
+gh pr create --base {baseBranch} --assignee @me --title "{type}({scope}): {description}" --body "$(cat <<'EOF'
 ## 개요
 {이 PR이 해결하는 문제 또는 추가하는 기능}
 
@@ -224,6 +226,7 @@ state.json의 `testDatabase` 필드가 존재하면 `rules/common/test-db-isolat
 - [ ] Code review 완료, CRITICAL/HIGH 해소
 - [ ] Gate 3 통과 (사용자 확인, commit 전)
 - [ ] 커밋 완료 (plans/ 파일 제외)
-- [ ] main 모드: push 미실행 + push 안내 출력 / worktree 모드: PR 생성 + URL 보고
+- [ ] 커밋 메시지에 Claude/AI co-author 트레일러 없음
+- [ ] main 모드: push 미실행 + push 안내 출력 / worktree 모드: PR 생성(본인 `--assignee @me` 지정) + URL 보고
 - [ ] state JSON 갱신 — currentPhase = "completed" (worktree 모드: pullRequest 필드 포함)
 - [ ] 테스트 DB 자동 삭제 완료, state의 testDatabase = null

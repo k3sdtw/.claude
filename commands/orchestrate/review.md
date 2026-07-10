@@ -187,7 +187,7 @@ state JSON을 Read → 아래 필드 갱신 → Write:
 
 **`autonomy` 값에 따라 분기**한다:
 
-- **자율 모드 (`auto`)**: 리뷰 결과 요약을 출력하고 **자동 통과**한다 (모든 CRITICAL/HIGH가 해소된 경우). 미해소 CRITICAL/HIGH가 남았으면 [에스컬레이션 조건](../orchestrate.md#autonomy-mode-게이트-자동-통과-vs-승인) 6번에 따라 멈추고 질문한다.
+- **자율 모드 (`auto`)**: 리뷰 결과 요약을 보고하고 **즉시 자동 통과**해 impl phase로 진행한다 (모든 CRITICAL/HIGH가 해소된 경우). 사용자에게 "진행할까요?" 같은 확인을 **묻지 않는다.** 미해소 CRITICAL/HIGH가 남았을 때만 [에스컬레이션 조건](../orchestrate.md#autonomy-mode-게이트-자동-통과-vs-승인) 6번에 따라 멈추고 질문한다.
 - **게이트 모드 (`gated`)**: **STOP.** 리뷰 결과 요약을 보여주고 사용자에게 확인을 요청한다.
 
 통과(자동 또는 확인)하면 → state JSON을 Read → 아래 필드 갱신 → Write:
@@ -205,7 +205,7 @@ state JSON을 Read → 아래 필드 갱신 → Write:
 - [ ] CRITICAL/HIGH 이슈가 모두 해소됨
 - [ ] 플랜 markdown에 승인 상태 기록
 - [ ] state JSON의 expertReviews 필드에 각 에이전트 결과 기록
-- [ ] Gate 2 통과 (사용자 확인)
+- [ ] Gate 2 통과 — 자율 모드: 확인 없이 자동 진행 / 게이트 모드: 사용자 확인
 
 > `/orchestrate`로 실행 중이면 자동으로 impl phase로 진행한다.
 > 단독 실행(`/orchestrate:review`)이면 사용자에게 안내: `/orchestrate:impl`

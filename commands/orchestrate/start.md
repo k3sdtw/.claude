@@ -229,7 +229,7 @@ Write 도구로 사람이 읽는 플랜 문서를 생성한다. 포함할 내용
 
 두 파일 작성 완료 후, **`autonomy` 값에 따라 분기**한다:
 
-**자율 모드 (`auto`)** — 플랜의 핵심 요약(요구사항, phase 구조, 에이전트 배정)을 텍스트로 출력하고 **자동 통과**한다. 단 요구사항이 애매하거나 [에스컬레이션 조건](../orchestrate.md#autonomy-mode-게이트-자동-통과-vs-승인)에 해당하면 멈추고 AskUserQuestion으로 질문한다.
+**자율 모드 (`auto`)** — 플랜의 핵심 요약(요구사항, phase 구조, 에이전트 배정)을 텍스트로 보고하고 **즉시 자동 통과**해 review phase로 진행한다. "플랜을 승인할까요?" 같은 확인을 **묻지 않는다.** 단 요구사항이 애매하거나 [에스컬레이션 조건](../orchestrate.md#autonomy-mode-게이트-자동-통과-vs-승인)에 해당하면 멈추고 AskUserQuestion으로 질문한다.
 
 **게이트 모드 (`gated`)**:
 1. 플랜의 핵심 요약을 텍스트로 출력한다
@@ -254,7 +254,7 @@ Write 도구로 사람이 읽는 플랜 문서를 생성한다. 포함할 내용
 - [ ] Workspace 확인 완료 — main 모드: repo 루트 + working tree 상태 확인 / worktree 모드: 생성 + 진입 + 브랜치 일치
 - [ ] `plans/{identifier}.state.json` 생성, 모든 필드 값이 채워짐
 - [ ] `plans/{identifier}.md` 작성, 구현 플랜 포함
-- [ ] Gate 1 통과 (사용자가 플랜 확인)
+- [ ] Gate 1 통과 — 자율 모드: 확인 없이 자동 진행 / 게이트 모드: 사용자가 플랜 확인
 
 > `/orchestrate`로 실행 중이면 자동으로 review phase로 진행한다.
 > 단독 실행(`/orchestrate:start`)이면 사용자에게 안내: `/orchestrate:review`

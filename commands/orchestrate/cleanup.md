@@ -11,17 +11,20 @@ orchestrate가 만든 산출물(worktree, 로컬·원격 브랜치, plan·state 
 
 ## 0. Discover (읽기)
 
-1. **main repo 루트로 이동** — worktree 안에서 실행됐을 수 있으므로 첫 번째 worktree(= main repo)를 기준으로 한다:
-   ```bash
-   MAIN_REPO=$(git worktree list | head -1 | awk '{print $1}')
-   cd "$MAIN_REPO"
-   ```
-2. **대상 수집** — state 파일이 곧 orchestrate 산출물의 증거다:
-   - main repo의 `plans/*.state.json` (main 모드 잔재)
-   - `git worktree list`의 각 worktree 경로에서 `{path}/plans/*.state.json` (worktree 모드 잔재)
-3. 각 state를 Read로 파싱: `identifier`, `workspace`, `branchName`, `baseBranch`, `currentPhase`, `pullRequest`, `testDatabase`
-4. 대상이 없으면 → "정리할 orchestrate 산출물이 없습니다" 보고 후 종료
+**cleanup은 실행된 현재 worktree(= 자기 자신)만 정리한다. 다른 worktree의 작업은 조사·정리하지 않는다.**
 
+1. **자기 자신 식별** — cleanup이 실행된 현재 worktree가 유일한 정리 대상이다. worktree 제거는 그 내부에서 실행할 수 없으므로 main repo 경로도 함께 잡아둔다(삭제 실행 위치용):
+   ```bash
+   SELF_WORKTREE=$(git rev-parse --show-toplevel)               # 정리 대상 = 현재 worktree
+   MAIN_REPO=$(git worktree list | head -1 | awk '{print $1}')  # worktree 제거를 실행할 위치
+   ```
+2. **대상 수집 — 오직 현재 worktree의 state만** 읽는다. `git worktree list`로 **다른 worktree를 순회하지 않는다**:
+   - `{SELF_WORKTREE}/plans/*.state.json`
+3. state를 Read로 파싱: `identifier`, `workspace`, `branchName`, `baseBranch`, `currentPhase`, `pullRequest`, `testDatabase`, `workPath`
+   - `SELF_WORKTREE == MAIN_REPO`이면 현재 위치가 main repo다 → 자기 자신은 main 모드 잔재(파일·DB)뿐이다 (worktree·브랜치 없음). 이때도 다른 worktree는 건드리지 않는다.
+4. 현재 worktree에 state가 없으면 → "이 worktree에는 정리할 orchestrate 산출물이 없습니다" 보고 후 종료. **다른 worktree를 뒤지지 않는다.**
+
+> 단일 대상 원칙: 이후 §1~§4의 "대상"은 항상 이 현재 worktree 하나를 가리킨다.
 > state 없이 브랜치만 남은 잔재는 orchestrate 소속임을 단정할 수 없다 — 발견되면 목록만 보여주고 삭제 대상에 자동 포함하지 않는다.
 
 ## 1. Inspect (삭제 안전성 평가 — 읽기)
@@ -87,9 +90,8 @@ git push origin --delete {branchName}
   경고: {⚠️ 항목들 — 없으면 "없음"}
 ```
 
-AskUserQuestion(multiSelect)으로 **무엇을 지울지** 선택받는다:
-- 대상이 여러 개면 identifier별로 선택
-- ⚠️가 있는 대상은 경고를 명시하고 기본 제외를 권고
+AskUserQuestion(multiSelect)으로 **무엇을 지울지** 선택받는다 (대상은 현재 worktree 하나뿐이므로 항목별로 선택):
+- ⚠️가 있는 항목은 경고를 명시하고 기본 제외를 권고
 - **원격 브랜치 삭제는 별도 선택지**로 분리한다 — 로컬 정리에 묶어 암묵적으로 지우지 않는다
 - OPEN PR이 걸린 원격 브랜치는 선택지에서 제외하고 사유를 표시한다
 
@@ -133,11 +135,14 @@ rmdir plans 2>/dev/null || true    # 디렉토리가 비었으면 함께 제거
 
 ## 4. Verify & Report (읽기)
 
+> 검증은 자기 자신 대상(현재 worktree·브랜치)에 대해서만 수행한다. 삭제 실행 후 현재 worktree가 사라졌을 수 있으므로 `$MAIN_REPO`에서 확인한다.
+
 ```bash
-git worktree list                          # 삭제된 worktree가 없는지
+cd "$MAIN_REPO"
+git worktree list | grep {branchName}      # 자기 worktree가 제거됐는지 (출력 없어야 정상)
 git branch --list {branchName}             # 로컬 브랜치 제거 확인
 git ls-remote --heads origin {branchName}  # 원격 브랜치 제거 확인 (삭제한 경우)
-ls plans/ 2>/dev/null                      # 파일 제거 확인
+ls plans/ 2>/dev/null                      # main 모드였다면 파일 제거 확인
 ```
 
 항목별 결과를 보고한다. **자동 삭제(§1.5 안전 대상)와 승인 삭제(§2 경고 대상)를 구분**해 — 각 항목이 어느 경로로 정리됐는지 함께 밝힌다:
@@ -154,7 +159,8 @@ ls plans/ 2>/dev/null                      # 파일 제거 확인
 
 ## Done Criteria
 
-- [ ] 모든 orchestrate state 기반 산출물이 발견·평가됨
+- [ ] **현재 worktree(자기 자신)의 state 산출물만** 발견·평가됨 — 다른 worktree는 조사하지 않음
+- [ ] 현재 worktree에 state가 없으면 다른 worktree를 뒤지지 않고 즉시 종료
 - [ ] 안전 대상(completed + 미커밋 없음 + 미push 없음 + PR MERGED)은 승인 없이 자동 삭제됨
 - [ ] 경고(⚠️) 대상만 GATE로 사용자 명시 승인 후 삭제됨
 - [ ] 자동 삭제분·승인 삭제분을 구분해 항목별 성공/실패 보고

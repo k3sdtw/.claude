@@ -177,10 +177,13 @@ verification 완료 후 state JSON을 Read → 아래 필드 갱신 → Write:
     "test": "pass",                    // 또는 "fail"
     "lastRunAt": "{현재 ISO 8601}"
   },
+  "implVerifiedClean": true,           // lint·build·test 전부 pass일 때만 true. 하나라도 fail이면 false 유지
   "currentPhase": "done",
   "updatedAt": "{현재 ISO 8601}"
 }
 ```
+
+> `implVerifiedClean`은 **전체 통과 시에만** true로 쓴다. done phase가 곧바로 이어질 때 중복 검증을 건너뛰기 위한 플래그다.
 
 ## Done Criteria
 

@@ -133,6 +133,7 @@ E2E pipeline: requirements → workspace → plan → expert review → implemen
     "test": null,
     "lastRunAt": null                  // ISO 8601 timestamp
   },
+  "implVerifiedClean": false,          // impl 검증 통과 후 편집 없음 → done 첫 검증 스킵 가능. 이후 어떤 편집(code-fix 등)이든 발생하면 false로 무효화
 
   "pullRequest": {                     // worktree 모드만 채워짐
     "url": null,

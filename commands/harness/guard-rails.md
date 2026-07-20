@@ -65,20 +65,56 @@ case "$CMD" in
   *"rm -rf /"*|*"rm -rf ~"*)        block "위험한 재귀 삭제" "경로를 좁히거나 사람이 직접 실행하라." ;;
   *"git push --force"*|*"push -f"*) block "강제 푸시" "--force-with-lease를 쓰거나 사람 승인 후 실행." ;;
   *"git reset --hard"*)             block "하드 리셋(작업 손실 위험)" "변경을 stash로 보존 후 진행." ;;
-  *"DROP TABLE"*|*"TRUNCATE"*)      block "파괴적 SQL" "마이그레이션 검토 + 사람 승인 필요." ;;
+  *"DROP TABLE"*|*"TRUNCATE"*)
+    # 예외: orchestrate가 만든 폐기용 격리 테스트 DB (rules/common/test-db-isolation.md)
+    case "$CMD" in *_test_*|*orch_tmpl_*) ;;
+      *) block "파괴적 SQL" "마이그레이션 검토 + 사람 승인 필요." ;; esac ;;
   *"down -v"*)                      block "도커 볼륨 삭제" "데이터 손실 위험. 사람이 확인." ;;
   *"terraform apply"*|*"tofu apply"*) block "인프라 적용" "plan 검토 + 사람 승인 후 직접 실행." ;;
 esac
 
-# (b) 시크릿 접근
-case "$CMD" in
-  *.env|*.env.*|*.pem|*"credentials"*|*"id_rsa"*)
-    # .env.example/.env.test.example 같은 템플릿은 허용
-    case "$CMD" in *".example") ;; *) block "시크릿 파일 접근" "시크릿은 에이전트 컨텍스트에 넣지 마라. 템플릿(.example)만 다뤄라." ;; esac ;;
+# (b) 시크릿 — 파일 접근 자체가 아니라 "값이 새어나오는가"로 판단한다.
+#     .env를 셸이 로드하는 것(sourcing)은 값을 노출하지 않는다 → 허용.
+#     값을 stdout으로 꺼내는 것만 차단 → 컨텍스트·로그 오염 방지.
+case "$TOOL" in
+  Read|Write|Edit)
+    # 파일 내용이 통째로 에이전트 컨텍스트에 들어온다 → 템플릿(.example)만 허용
+    case "$CMD" in
+      *".example") ;;
+      *.env|*.env.*|*.pem|*"credentials"*|*"id_rsa"*)
+        block "시크릿 파일을 컨텍스트로 읽기" \
+              "값은 필요 없다. 셸에서 'set -a; . ./.env; set +a'로 로드하고 필요한 조각만 출력하라." ;;
+    esac ;;
+  Bash)
+    case "$CMD" in
+      # 로드(sourcing)는 값을 노출하지 않는다 → 통과
+      *"set -a"*|*". ./.env"*|*"source ./.env"*|*". .env"*|*"source .env"*) ;;
+      # 파일 내용을 stdout으로 흘리는 것
+      *cat*.env*|*grep*.env*|*head*.env*|*tail*.env*|*sed*.env*|*awk*.env*|*"cat "*.pem*|*"cat "*id_rsa*)
+        block "시크릿 값 출력" \
+              "값을 stdout으로 꺼내지 마라. 'set -a; . ./.env; set +a' 후 필요한 조각만 echo하라." ;;
+      # 환경변수 값을 통째로 출력하는 것
+      *'echo $DATABASE_URL'*|*'printenv'*|*'env | '*)
+        block "환경변수 값 출력" \
+              "credential이 로그에 남는다. 스킴·host·DB 이름 등 필요한 조각만 파라미터 확장으로 출력하라." ;;
+    esac ;;
 esac
 
 exit 0
 ```
+
+### 시크릿 가드가 "경로"가 아니라 "유출"을 보는 이유
+
+경로 기반 차단(`*.env` 매칭)은 **정당한 작업까지 막는다**. 대표적으로 orchestrate의 테스트 DB 격리는
+`.env`에서 `DATABASE_URL`을 알아야 하는데, 차단당한 에이전트는 포기하지 않고 `cat`·`grep`·`sed`로
+우회를 시도한다 — 그 결과 **원래 막으려던 credential이 오히려 컨텍스트에 남는다.**
+
+그래서 기준을 옮긴다: 파일을 셸이 로드하는 것(`. ./.env`)은 값이 어디에도 출력되지 않으므로 허용하고,
+값이 stdout으로 나오는 경로만 막는다. 값이 필요한 쪽은 [test-db-isolation](../../rules/common/test-db-isolation.md)의
+감지 스니펫처럼 **스킴·host·DB 이름 같은 조각만** 출력하면 된다.
+
+> 한계: `set -a; . ./.env; set +a; cat .env`처럼 허용 패턴과 결합하면 첫 매칭에서 통과한다.
+> 과차단을 피하려는 의도적 트레이드오프다 — 가드는 사고를 줄일 뿐 유일한 방어선이 아니다.
 
 이 목록은 **시작점**이다. 1단계 진단에서 이 레포 특유의 위험(특정 배포 스크립트, 특정 프로드
 엔드포인트 등)을 발견하면 case에 추가하라. 단, **과차단 주의** — 정당한 작업까지 막으면

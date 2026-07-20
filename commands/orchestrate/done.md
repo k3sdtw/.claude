@@ -33,16 +33,18 @@ Prerequisite: `/orchestrate:impl`에서 구현 완료.
 state JSON의 `commands` 필드에 저장된 명령어를 순서대로 실행한다.
 
 **테스트 DB 격리:** `rules/common/test-db-isolation.md` 프로토콜을 따른다.
-state.json에 `testDatabase` 필드가 이미 있으면 기존 DB를 재사용한다.
-없으면 프로토콜의 1~6단계를 수행한 후 테스트를 실행한다.
+state.json에 `testDatabase.name`이 있고 실제 DB가 존재하면 기존 DB를 재사용한다 (impl에서 만든 것).
+없을 때만 프로토콜의 1~6단계를 수행한 후 테스트를 실행한다.
 
 ```
 각 iteration:
   1. Lint:  commands.lint 값을 Bash로 실행
   2. Build: commands.build 값을 Bash로 실행 → 실패 시 수정 후 iteration 재시작
-  3. Test:  DATABASE_URL="{testDatabase.url}" {commands.test} 실행 → 실패 시 수정 후 iteration 재시작
+  3. Test:  프로토콜 §5의 서브셸 형태로 실행 → 실패 시 수정 후 iteration 재시작
   4. 모두 통과 → 루프 종료
 ```
+
+> `.env`를 Read 도구로 읽지 않는다 — 셸이 로드하고 필요한 조각만 출력한다 (프로토콜 상단 원칙).
 
 > state JSON에 commands 값이 없으면 AskUserQuestion으로 사용자에게 명령어를 직접 질문
 

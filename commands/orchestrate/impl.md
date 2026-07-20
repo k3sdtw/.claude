@@ -149,9 +149,9 @@ return { phases: done, files: done.flatMap(d => d.results.flatMap(r => r.files))
 1. **Lint**: `commands.lint` 값을 Bash로 실행 (예: `pnpm lint`)
 2. **Build**: `commands.build` 값을 Bash로 실행 (예: `pnpm build`)
 3. **Test DB 준비**: `rules/common/test-db-isolation.md` 프로토콜의 1~6단계를 수행한다.
-   - state.json에 `testDatabase` 필드가 이미 있으면 기존 DB 재사용
-   - 없으면 감지 → 생성 → 마이그레이션 → state 기록
-4. **Test**: `DATABASE_URL="{testDatabase.url}" {commands.test}` 형태로 실행
+   - state.json에 `testDatabase.name`이 있고 실제 DB가 존재하면 기존 DB 재사용
+   - 없으면 감지 → 템플릿 복제 → state 기록 (템플릿이 이미 있으면 마이그레이션은 돌지 않는다)
+4. **Test**: 프로토콜 §5의 서브셸 형태로 실행한다. `.env`를 Read하거나 URL을 인자로 늘어놓지 않는다
 
 > state JSON에 commands 값이 없는 경우 → AskUserQuestion으로 사용자에게 명령어를 직접 질문
 

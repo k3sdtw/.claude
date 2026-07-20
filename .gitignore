@@ -17,3 +17,6 @@
 !.mcp.json
 !hooks/
 !hooks/**/*
+
+# macOS — 위 allowlist(!**/*)가 되살리므로 반드시 뒤에 둔다
+.DS_Store

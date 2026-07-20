@@ -15,19 +15,7 @@
       "Bash(rm -rf *)"
     ]
   },
-  "model": "claude-fable-5[1m]",
-  "statusLine": {
-    "type": "command",
-    "command": "~/.claude/cc-chips/engine.sh"
-  },
-  "effortLevel": "xhigh",
-  "fastMode": true,
-  "tui": "fullscreen",
-  "skipDangerousModePermissionPrompt": true,
-  "theme": "dark-daltonized",
-  "editorMode": "vim",
-  "remoteControlAtStartup": true,
-  "agentPushNotifEnabled": true,
+  "model": "opus[1m]",
   "hooks": {
     "UserPromptSubmit": [
       {
@@ -39,5 +27,17 @@
         ]
       }
     ]
-  }
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "~/.claude/cc-chips/engine.sh"
+  },
+  "effortLevel": "xhigh",
+  "fastMode": true,
+  "tui": "fullscreen",
+  "skipDangerousModePermissionPrompt": true,
+  "theme": "dark-daltonized",
+  "editorMode": "vim",
+  "remoteControlAtStartup": true,
+  "agentPushNotifEnabled": true
 }

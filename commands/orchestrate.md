@@ -121,11 +121,12 @@ E2E pipeline: requirements → workspace → plan → expert review → implemen
     "doneVerify": 0                    // done: verification 시도 (최대 3)
   },
 
-  "testDatabase": {
-    "name": null,                      // 테스트 전용 DB 이름 (impl/done에서 생성)
-    "url": null,                       // 치환된 DATABASE_URL
-    "type": null                       // postgresql | mysql | sqlite | mongodb
-  },
+  "testDatabase": {                    // 프로토콜: rules/common/test-db-isolation.md
+    "name": null,                      // 워크플로우 전용 DB 이름 (impl/done에서 생성)
+    "template": null,                  // 재사용 중인 템플릿 DB (마이그레이션 1회분 캐시 — cleanup 대상 아님)
+    "type": null,                      // postgresql | mysql | sqlite | mongodb
+    "migrate": null                    // 캐시된 마이그레이션 명령 — 매 워크플로우 재탐색 방지
+  },                                   // URL은 저장하지 않는다 (credential이 디스크에 남는다)
 
   "verification": {
     "lint": null,                      // null → "pass" 또는 "fail"

@@ -1,5 +1,5 @@
 ---
-description: Full orchestrated workflow. Requirements → workspace → plan → expert review → implement → verify → ship (commit/PR).
+description: Full orchestrated workflow. Requirements → workspace → plan → expert review → implement → verify → ship (commit/PR). Use --fast to skip expert review and collapse verification into a single pass.
 ---
 
 # Orchestrate Workflow
@@ -27,8 +27,10 @@ E2E pipeline: requirements → workspace → plan → expert review → implemen
 
 | Input | Mode |
 |-------|------|
-| (기본 — 플래그 없음) | **worktree** — gtr로 격리된 worktree를 만들고 그 안에서 개발 |
+| (기본 — `--main`이 없으면) | **worktree** — gtr로 격리된 worktree를 만들고 그 안에서 개발 |
 | `--main` flag | **main** — 현재 체크아웃(main 브랜치)에서 직접 개발. 워크스페이스를 만들지 않는다 |
+
+> workspace를 결정하는 것은 `--main` 하나뿐이다. `--fast`·`--gated`는 다른 축이므로 workspace에 영향을 주지 않는다.
 
 | | main 모드 | worktree 모드 |
 |---|----------|---------------|
@@ -36,6 +38,38 @@ E2E pipeline: requirements → workspace → plan → expert review → implemen
 | 브랜치 | 현재 브랜치 그대로 (보통 main) | `{identifier}` feature 브랜치 |
 | 마무리 | **commit까지만** — push는 사용자가 직접 | commit → push → **PR 생성** |
 | gtr 미설치 시 | 무관 | **STOP** — 설치 안내 |
+
+## Speed Mode (`--fast`)
+
+`--fast` 플래그는 **오래 걸리는 단계를 스킵·간소화**해 파이프라인을 최단 경로로 통과시킨다. state의 `speed`에 기록한다 (`"normal"` 기본 / `"fast"`).
+
+**속도 축은 게이트 축(autonomy)과 직교한다.** `--fast`는 무엇을 *하는지*를 줄이고, `--gated`는 *누가 승인하는지*를 바꾼다. 두 플래그는 자유롭게 조합된다.
+
+| 단계 | normal | **fast** |
+|------|--------|----------|
+| 요구사항 Q&A | 최대 2라운드 | **최대 1라운드** — 추론 가능하면 생략 |
+| 플랜 문서 | 7개 섹션 풀 문서 | **3개 섹션 축약** (Requirements · Implementation Phases · Risk) |
+| **Phase 2 (expert review)** | 전문가 4~6명 병렬 리뷰 + 수정 루프(2회) | **통째로 스킵** — start → impl로 직행 |
+| impl verification | lint + build + test | **스킵** — done에서 1회로 통합 |
+| done verification | 조건부 스킵 가능 | **반드시 1회 실행** (lint + build + test) |
+| done 코드 리뷰 | security + code 병렬, 수정 루프 2회 | **동일하게 유지**, 수정 루프 **1회** |
+| 커밋 분할 | 논리 단위 최대 4개 | **단일 커밋** |
+
+### fast에서도 줄이지 않는 것 (MOST IMPORTANT)
+
+expert review를 통째로 스킵하므로 **done phase의 코드 리뷰가 유일한 안전망**이다. 아래는 fast에서도 그대로 유지한다:
+
+1. **done phase의 verification 1회** — lint + build + test 전부. 스킵 조건을 적용하지 않는다.
+2. **done phase의 코드 리뷰** — `security-reviewer` + `code-reviewer` 병렬. 축소·생략하지 않는다.
+3. **에스컬레이션 조건** — 아래 [Autonomy Mode](#autonomy-mode-게이트-자동-통과-vs-승인)의 6개 조건 전부. fast는 속도를 위해 *검토 단계*를 줄이는 것이지 *판단 기준*을 낮추는 것이 아니다.
+4. **테스트 DB 격리** — 로컬/원격 판정을 포함한 [test-db-isolation](../rules/common/test-db-isolation.md) 프로토콜 전체.
+
+### fast를 쓰지 말아야 할 때
+
+아래에 해당하면 fast를 쓰지 않도록 **1줄 경고하고 사용자에게 확인**받는다 (start phase에서 판단):
+
+- 스키마 마이그레이션·auth/authz 변경·외부 API 계약 변경이 요구사항에 포함된 경우 — 플랜 단계 리뷰가 실제로 값어치를 하는 영역이다
+- 요구사항이 애매해 해석이 갈리는 경우 — 잘못된 플랜으로 직행하면 fast가 오히려 느리다
 
 ## Autonomy Mode (게이트 자동 통과 vs 승인)
 
@@ -51,6 +85,8 @@ E2E pipeline: requirements → workspace → plan → expert review → implemen
 | `--main --gated` | main | `gated` | 동일 — 게이트 승인 방식 |
 
 > **자율 모드는 worktree 전용이다.** main 모드는 실제 main/master에 직접 commit될 수 있어([safety.md](../rules/devops/safety.md) §4) 자율 커밋을 허용하지 않는다. `--main`으로 실행하면 게이트 승인 방식으로 진행하고, 무인 진행이 필요하면 플래그 없이(기본 worktree) 실행하도록 안내한다.
+>
+> `--fast`는 위 표 어느 행에도 조합된다 — autonomy 값을 바꾸지 않는다 ([Speed Mode](#speed-mode---fast)).
 
 ### 에스컬레이션 조건 (자율 모드에서도 반드시 멈추고 질문)
 
@@ -72,6 +108,8 @@ E2E pipeline: requirements → workspace → plan → expert review → implemen
 | Gate 3 (ship) | 자동 통과 → push + PR | 승인 요청 |
 | MEDIUM/LOW findings | 보고만 하고 자동 진행 | 진행 여부 확인 |
 | phase 경계 `/compact` | 요청하지 않고 자동 진행 (컨텍스트는 state에 영속되어 안전) | 요청 후 대기 |
+
+> `speed = "fast"`면 Gate 2(리뷰)는 review phase 자체가 없으므로 **존재하지 않는다** — `gates.review`는 `"skipped"`로 기록한다. Gate 1·3은 위 표 그대로 동작한다.
 
 ## State Management
 
@@ -104,20 +142,22 @@ E2E pipeline: requirements → workspace → plan → expert review → implemen
     "test": "pnpm test:e2e"
   },
 
-  "currentPhase": "start",             // "start" → "review" → "impl" → "done" → "completed"
+  "currentPhase": "start",             // normal: "start" → "review" → "impl" → "done" → "completed"
+                                       // fast:   "start" → "impl" → "done" → "completed" (review 없음)
   "autonomy": "auto",                  // "auto"(worktree 기본 — 게이트 자동 통과) 또는 "gated"(각 게이트 승인). main 모드는 항상 "gated"
+  "speed": "normal",                   // "normal" 또는 "fast"(--fast — review 스킵·검증 1회·단일 커밋). autonomy와 직교
   "gates": {
     "plan": false,                     // Gate 1: 플랜 승인
-    "review": false,                   // Gate 2: expert review 승인
+    "review": false,                   // Gate 2: expert review 승인. fast 모드는 "skipped"
     "finish": false                    // Gate 3: commit/PR 승인
   },
 
-  "expertReviews": {},                 // review phase에서 채워짐
+  "expertReviews": {},                 // review phase에서 채워짐. fast 모드는 {} 유지
 
   "attempts": {                        // 실패 루프 카운터 — state에 영속되어 세션이 끊겨도 한도 유지
-    "planFix": 0,                      // review: 플랜 수정 순환 (최대 2)
-    "implVerify": 0,                   // impl: verification 시도 (최대 3)
-    "codeFix": 0,                      // done: 코드 리뷰 수정 순환 (최대 2)
+    "planFix": 0,                      // review: 플랜 수정 순환 (최대 2). fast는 review가 없어 미사용
+    "implVerify": 0,                   // impl: verification 시도 (최대 3). fast는 impl 검증이 없어 미사용
+    "codeFix": 0,                      // done: 코드 리뷰 수정 순환 (normal 최대 2 / fast 최대 1)
     "doneVerify": 0                    // done: verification 시도 (최대 3)
   },
 
@@ -135,6 +175,7 @@ E2E pipeline: requirements → workspace → plan → expert review → implemen
     "lastRunAt": null                  // ISO 8601 timestamp
   },
   "implVerifiedClean": false,          // impl 검증 통과 후 편집 없음 → done 첫 검증 스킵 가능. 이후 어떤 편집(code-fix 등)이든 발생하면 false로 무효화
+                                       // fast 모드는 impl에서 검증하지 않으므로 항상 false — done이 반드시 검증한다
 
   "pullRequest": {                     // worktree 모드만 채워짐
     "url": null,
@@ -191,7 +232,8 @@ main 모드에서는 gtr을 사용하지 않는다.
 7. Expert review·impl 에이전트는 반드시 병렬 실행한다 — review는 **Task 병렬**, impl은 **Workflow**(phase barrier·resume 필요 시). 각 sub-command 파일 참조. Workflow 스크립트 작성 규칙: [rules/common/workflow-authoring.md](../rules/common/workflow-authoring.md)
 8. **State JSON이 권위적 소스** — 에이전트는 state JSON에서 읽되, plan markdown을 파싱하지 않는다
 9. **main 모드에서는 push·PR을 자동 실행하지 않는다** — commit까지만 하고 push는 사용자에게 안내한다
-10. **동시 워크플로우 최대 2개** — 모든 세션이 하나의 usage limit을 공유한다. start phase에서 `plans/*.state.json` 중 진행 중(currentPhase ≠ "completed")인 워크플로우가 이미 2개 이상이면 사용자에게 경고하고, 기존 워크플로우 완료 후 순차 시작을 권고한다. 다른 worktree·레포에서 병렬 실행 중인 세션은 감지할 수 없으므로 사용자에게 한 번 확인한다
+10. **`--fast`는 검토 단계를 줄일 뿐 판단 기준을 낮추지 않는다** — review phase를 스킵해도 done phase의 verification 1회와 코드 리뷰(security + code 병렬)는 반드시 수행하고, 에스컬레이션 조건은 normal과 동일하게 적용한다 ([Speed Mode](#speed-mode---fast))
+11. **동시 워크플로우 최대 2개** — 모든 세션이 하나의 usage limit을 공유한다. start phase에서 `plans/*.state.json` 중 진행 중(currentPhase ≠ "completed")인 워크플로우가 이미 2개 이상이면 사용자에게 경고하고, 기존 워크플로우 완료 후 순차 시작을 권고한다. 다른 worktree·레포에서 병렬 실행 중인 세션은 감지할 수 없으므로 사용자에게 한 번 확인한다
 
 ## Idempotency (재진입 처리)
 
@@ -200,8 +242,10 @@ main 모드에서는 gtr을 사용하지 않는다.
 
 ## Pipeline Flow (자동 연속 실행)
 
-`/orchestrate` 실행 시 4개 phase를 **하나의 세션에서 자동으로 연속 실행**한다.
+`/orchestrate` 실행 시 phase들을 **하나의 세션에서 자동으로 연속 실행**한다.
 사용자가 개별 sub-command를 입력할 필요 없다. Gate 확인만 하면 자동으로 다음 phase로 진행한다.
+
+**normal (기본) — 4 phase:**
 
 ```
 [Project Context] → automatic (CLAUDE.md 기반)
@@ -215,6 +259,16 @@ main 모드에서는 gtr을 사용하지 않는다.
 [Phase 4: Done]    → State Guard → verify → code review → GATE 3 → ship (main: commit / worktree: commit+push+PR)
 ```
 
+**fast (`--fast`) — 3 phase:**
+
+```
+[Phase 1: Start]   → workspace 설정 → context 추출 → state.json + 축약 plan.md → GATE 1
+     ↓ (Phase 2 Review 통째로 스킵 — gates.review = "skipped")
+[Phase 2: Impl]    → State Guard → parallel agent implementation → (검증 스킵)
+     ↓ (에이전트 완료 즉시 자동 진행)
+[Phase 3: Done]    → State Guard → verify 1회(필수) → code review → GATE 3 → ship (단일 커밋)
+```
+
 ### Phase 실행 방법
 
 각 phase의 상세 지침은 sub-command 파일에 정의되어 있다.
@@ -223,9 +277,9 @@ main 모드에서는 gtr을 사용하지 않는다.
 | 순서 | 파일 | 진입 조건 |
 |------|------|-----------|
 | 1 | `~/.claude/commands/orchestrate/start.md` | 즉시 시작 |
-| 2 | `~/.claude/commands/orchestrate/review.md` | Gate 1 통과 (gates.plan = true) |
-| 3 | `~/.claude/commands/orchestrate/impl.md` | Gate 2 통과 (gates.review = true) |
-| 4 | `~/.claude/commands/orchestrate/done.md` | impl verification 통과 |
+| 2 | `~/.claude/commands/orchestrate/review.md` | Gate 1 통과 (gates.plan = true). **`speed = "fast"`면 이 파일을 Read하지 않고 건너뛴다** |
+| 3 | `~/.claude/commands/orchestrate/impl.md` | normal: Gate 2 통과 (gates.review = true) / fast: Gate 1 통과 즉시 |
+| 4 | `~/.claude/commands/orchestrate/done.md` | normal: impl verification 통과 / fast: impl 에이전트 완료 |
 
 ### 자동 진행 규칙
 
@@ -265,4 +319,9 @@ state 파일 기반으로 대상을 발견하고, 안전성 검사(미커밋 변
 /orchestrate add voucher notification                  # worktree + 자율 모드 (기본) — 무인 진행 → PR. 애매/중대 사항만 질문
 /orchestrate --gated add voucher                       # worktree + 게이트 모드 — 각 게이트에서 승인 요청
 /orchestrate --main add dashboard page                 # main 모드 — 자율 불가(worktree 전용), 게이트 승인 방식 + commit까지
+/orchestrate --fast fix typo in error message          # fast — review 스킵, 검증 1회, 단일 커밋 → 최단 경로로 PR
+/orchestrate --fast --gated tweak button color         # fast + 게이트 승인 (두 축은 직교하므로 조합 가능)
+/orchestrate --main --fast bump dependency version     # main + fast — 게이트 승인 방식 + commit까지, 단계는 축약
 ```
+
+> `--fast`는 **작고 자명한 변경**에 쓴다. 스키마 마이그레이션·auth 변경·API 계약 변경처럼 플랜 리뷰가 값어치를 하는 작업에는 플래그 없이 실행한다.

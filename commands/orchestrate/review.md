@@ -15,6 +15,9 @@ Prerequisite: `/orchestrate:start`에서 플랜 작성 완료 + Gate 1 통과.
    - 파일 없음 → STOP: "`/orchestrate:start`를 먼저 실행하세요"
    - 파일 여러 개 → 목록을 보여주고 AskUserQuestion으로 선택 요청
 2. **State 읽기**: Read 도구로 state.json을 읽고 JSON 파싱
+2a. **Speed 확인**: `speed === "fast"`면 이 phase는 원래 스킵 대상이다 ([Speed Mode](../orchestrate.md#speed-mode---fast)). `/orchestrate` 파이프라인은 여기로 진입하지 않으므로, 도달했다면 사용자가 **단독 실행**한 것이다 → AskUserQuestion으로 확인한다: "fast 모드 워크플로우입니다. expert review는 원래 스킵되는 단계인데 지금 실행할까요?"
+   - 실행 → 아래 절차를 정상 수행하고, 종료 시 `gates.review`를 `"skipped"`가 아닌 `true`로 기록한다
+   - 취소 → STOP: "`/orchestrate:impl`로 진행하세요"
 3. **작업 디렉토리 전환**: `workPath` 디렉토리 존재 확인 후 Bash `cd {workPath}` 실행 → 없으면 STOP. 이후 모든 명령은 이 디렉토리에서 실행
 4. **브랜치 확인** (worktree 모드만): `git branch --show-current`가 `branchName`과 일치하는지 확인 → 불일치 시 STOP. main 모드는 생략
 5. **필드 추출**: workspace, **autonomy**, projectType, techStack, commands, planFile, branchName, baseBranch 등 필요한 값 보관

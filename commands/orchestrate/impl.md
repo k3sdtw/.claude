@@ -17,7 +17,7 @@ Prerequisite: `/orchestrate:review`에서 expert 승인 완료 + Gate 2 통과.
 2. **State 읽기**: Read 도구로 state.json을 읽고 JSON 파싱
 3. **작업 디렉토리 전환**: `workPath` 디렉토리 존재 확인 후 Bash `cd {workPath}` 실행 → 없으면 STOP. 이후 모든 명령은 이 디렉토리에서 실행
 4. **브랜치 확인** (worktree 모드만): `git branch --show-current`가 `branchName`과 일치하는지 확인 → 불일치 시 STOP. main 모드는 생략
-5. **필드 추출**: workspace, projectType, techStack, commands, planFile, branchName, baseBranch 등 필요한 값 보관
+5. **필드 추출**: workspace, **speed**, projectType, techStack, commands, planFile, branchName, baseBranch 등 필요한 값 보관
 6. **Phase 갱신**: state의 `currentPhase`를 `"impl"`로, `updatedAt`을 현재 시각으로 갱신 → Write로 저장
 
 ## 1. Load Plan
@@ -144,6 +144,10 @@ return { phases: done, files: done.flatMap(d => d.results.flatMap(r => r.files))
 
 ## 4. Integration Verification
 
+> **fast 모드는 이 섹션 전체를 스킵한다.** `speed === "fast"`면 lint·build·test·테스트 DB 준비를 하지 않고 곧바로 §5로 간다 — 검증은 done phase에서 **1회로 통합**해 실행된다 ([Speed Mode](../orchestrate.md#speed-mode---fast)). 스킵을 사용자에게 1줄로 보고한다: "fast 모드 — 검증은 done phase에서 1회 실행합니다".
+>
+> 이때 `implVerifiedClean`은 **false로 남긴다.** done phase의 스킵 조건이 거짓이 되어 검증이 반드시 실행된다 — fast에서 검증이 통째로 사라지지 않도록 막는 장치다.
+
 모든 에이전트 완료 후, state JSON의 `commands` 필드에 저장된 명령어를 순서대로 실행:
 
 1. **Lint**: `commands.lint` 값을 Bash로 실행 (예: `pnpm lint`)
@@ -167,8 +171,9 @@ return { phases: done, files: done.flatMap(d => d.results.flatMap(r => r.files))
 
 ## 5. Update State
 
-verification 완료 후 state JSON을 Read → 아래 필드 갱신 → Write:
+state JSON을 Read → **`speed` 값에 따라** 아래 필드 갱신 → Write:
 
+**normal** — verification 결과를 기록:
 ```jsonc
 {
   "verification": {
@@ -183,15 +188,32 @@ verification 완료 후 state JSON을 Read → 아래 필드 갱신 → Write:
 }
 ```
 
+**fast** — 검증하지 않았으므로 결과를 남기지 않는다:
+```jsonc
+{
+  "verification": {
+    "lint": null,                      // 검증 미실행 — done phase가 채운다
+    "build": null,
+    "test": null,
+    "lastRunAt": null
+  },
+  "implVerifiedClean": false,          // 반드시 false — done의 검증 스킵 조건을 거짓으로 만든다
+  "currentPhase": "done",
+  "updatedAt": "{현재 ISO 8601}"
+}
+```
+
 > `implVerifiedClean`은 **전체 통과 시에만** true로 쓴다. done phase가 곧바로 이어질 때 중복 검증을 건너뛰기 위한 플래그다.
+> fast는 impl에서 검증하지 않으므로 항상 false다 — "검증 안 함"을 "검증 통과"로 잘못 기록하면 done이 검증을 건너뛰어 **아무도 검증하지 않은 코드가 PR로 나간다.**
 
 ## Done Criteria
 
 - [ ] 플랜의 모든 phase 에이전트가 완료됨
-- [ ] Lint 통과
-- [ ] Build 통과
-- [ ] Test 통과
-- [ ] state JSON의 verification 필드에 결과 기록
+- [ ] **normal만** — Lint 통과
+- [ ] **normal만** — Build 통과
+- [ ] **normal만** — Test 통과
+- [ ] state JSON의 verification 필드 기록 — normal: 결과값 / fast: null 유지
+- [ ] `implVerifiedClean` — normal: 전체 통과 시에만 true / fast: 반드시 false
 - [ ] currentPhase가 "done"으로 갱신됨
 
 > `/orchestrate`로 실행 중이면 자동으로 done phase로 진행한다.

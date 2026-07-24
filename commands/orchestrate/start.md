@@ -85,11 +85,42 @@ WORK_PATH=$(git rev-parse --show-toplevel)
 git status --porcelain
 ```
 
-- `workspace = "main"`, `branchName = null`, `workPath = WORK_PATH`, **`autonomy = "gated"`**
+- `workspace = "main"`, `branchName = null`, `workPath = WORK_PATH`, `worktreeCreated = false`, **`autonomy = "gated"`**
 - 자율 모드는 worktree 전용이다. `--main`으로 실행하면 **"main 모드는 게이트 승인 방식으로 진행합니다. 무인 진행(→ PR)이 필요하면 플래그 없이(기본 worktree) 실행하세요"**를 1줄 안내한다 ([safety.md](../../rules/devops/safety.md) §4 — 실제 main/master 직접 commit 방지).
 - working tree에 **기존 변경사항이 있으면** 사용자에게 알리고 진행 여부를 확인한다 — orchestrate의 변경분과 섞여 커밋 범위가 오염되는 것을 방지
 
 ### worktree 모드 (기본 — 플래그 없음)
+
+**먼저 실행 위치가 이미 linked worktree인지 감지한다.** 이미 worktree 안이면 **새로 만들지 않고 채택한다**(worktree 중첩 방지).
+
+```bash
+CURRENT_TOP=$(git rev-parse --show-toplevel)
+MAIN_TOP=$(git worktree list | head -1 | awk '{print $1}')   # main 작업 트리는 항상 목록 첫 줄
+[ "$CURRENT_TOP" != "$MAIN_TOP" ] && echo "ADOPT" || echo "CREATE"
+```
+
+| 결과 | 의미 | 경로 |
+|------|------|------|
+| `ADOPT` | 이미 linked worktree 안에서 실행 중 | **3-A. 채택** — 새 worktree 생성 안 함, gtr 불필요 |
+| `CREATE` | main 작업 트리에서 실행 중 | **3-B. 생성** — gtr로 새 worktree |
+
+#### 3-A. 기존 worktree 채택 (ADOPT)
+
+새 worktree를 만들지 않는다. 현재 worktree를 그대로 workspace로 쓰고, **브랜치는 현재 브랜치를 그대로 사용한다** — identifier로 브랜치를 새로 만들지 않는다.
+
+```bash
+WORK_PATH="$CURRENT_TOP"
+BRANCH_NAME=$(git branch --show-current)
+DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@')
+```
+
+- 결과 기록: `workspace = "worktree"`, `branchName = $BRANCH_NAME`, `workPath = $WORK_PATH`, **`worktreeCreated = false`** (orchestrate가 만든 게 아니므로 cleanup이 제거하지 않는다).
+- **안전 가드:**
+  - `BRANCH_NAME`이 비어 있으면(detached HEAD) → **STOP**: "현재 worktree가 detached HEAD입니다. feature 브랜치를 체크아웃한 뒤 다시 실행하세요."
+  - `BRANCH_NAME == DEFAULT_BRANCH`(base 브랜치 위의 worktree)면 자율 자동 커밋이 base 브랜치를 오염시킬 수 있다([safety.md](../../rules/devops/safety.md) §4) → **에스컬레이션**: AskUserQuestion으로 "① 다른 feature 브랜치를 만들어 진행 / ② 게이트 승인 방식(`gated`)으로 이 브랜치에서 진행 / ③ 중단" 중 선택받는다. (에스컬레이션이므로 [발화 규율](../orchestrate.md#output-discipline-발화-규율)의 발화 허용 시점이다.)
+- identifier(§2)는 state·plan 파일명에만 쓰고, 브랜치명으로는 쓰지 않는다.
+
+#### 3-B. 새 worktree 생성 (CREATE)
 
 > **CRITICAL: gtr은 Git subcommand다. 반드시 `git gtr`로 실행해야 한다. `gtr` 단독 실행은 command not found.**
 
@@ -123,6 +154,8 @@ cd "$WORK_PATH"
 [ "$(git branch --show-current)" = "$BRANCH_NAME" ] || echo "ERROR: worktree 진입 실패"
 ```
 
+- 결과 기록: `workspace = "worktree"`, `branchName = $BRANCH_NAME`, `workPath = $WORK_PATH`, **`worktreeCreated = true`**.
+
 **자동 실행 항목** (수동 실행 불필요):
 - `.gtrconfig`의 `[copy]` 패턴에 매칭되는 `.env` 파일 복사
 - `[hooks] postCreate` 명령어 실행 (예: `pnpm install --frozen-lockfile`)
@@ -132,7 +165,7 @@ cd "$WORK_PATH"
 
 **이미 동일 브랜치의 worktree가 존재하는 경우:**
 - AskUserQuestion: "이미 {BRANCH_NAME} worktree가 존재합니다. 해당 worktree를 사용할까요?"
-- 예 → 기존 worktree 경로로 cd
+- 예 → 기존 worktree 경로로 cd (그 worktree를 채택 — `worktreeCreated = false`)
 - 아니오 → STOP
 
 ## 4. Write Plan + State (workPath 안에서)
@@ -178,7 +211,8 @@ Write 도구로 아래 JSON을 생성한다 (모든 필드를 채울 것):
 {
   "identifier": "{slug}",
   "workspace": "{main | worktree}",
-  "branchName": "{worktree 모드: identifier, main 모드: null}",
+  "branchName": "{worktree 생성: identifier / worktree 채택: 현재 브랜치 / main 모드: null}",
+  "worktreeCreated": {worktree 생성: true / worktree 채택: false / main 모드: false},
   "baseBranch": "{4b에서 감지한 값}",
 
   "workPath": "{step 3에서 획득한 절대 경로}",
@@ -265,7 +299,7 @@ Workspace·Tech Stack·Affected Layers는 생략한다 — 앞의 둘은 state J
 
 두 파일 작성 완료 후, **`autonomy` 값에 따라 분기**한다:
 
-**자율 모드 (`auto`)** — 플랜의 핵심 요약(요구사항, phase 구조, 에이전트 배정)을 텍스트로 보고하고 **즉시 자동 통과**해 review phase로 진행한다. "플랜을 승인할까요?" 같은 확인을 **묻지 않는다.** 단 요구사항이 애매하거나 [에스컬레이션 조건](../orchestrate.md#autonomy-mode-게이트-자동-통과-vs-승인)에 해당하면 멈추고 AskUserQuestion으로 질문한다.
+**자율 모드 (`auto`)** — [발화 규율](../orchestrate.md#output-discipline-발화-규율)에 따라 **플랜 요약을 출력하지 않고 즉시 자동 통과**해 다음 phase로 진행한다. "플랜을 승인할까요?" 같은 확인을 **묻지 않는다.** 단 요구사항이 애매하거나 [에스컬레이션 조건](../orchestrate.md#autonomy-mode-게이트-자동-통과-vs-승인)에 해당하면 멈추고 AskUserQuestion으로 질문한다.
 
 **게이트 모드 (`gated`)**:
 1. 플랜의 핵심 요약을 텍스트로 출력한다
@@ -293,15 +327,15 @@ Workspace·Tech Stack·Affected Layers는 생략한다 — 앞의 둘은 state J
 }
 ```
 
-> fast에서는 `~/.claude/commands/orchestrate/review.md`를 **Read하지 않는다.** 곧바로 `impl.md`를 Read해 실행한다. 스킵 사실은 사용자에게 1줄로 보고한다: "fast 모드 — expert review를 건너뛰고 구현으로 진행합니다 (코드 리뷰는 done phase에서 수행)".
+> fast에서는 `~/.claude/commands/orchestrate/review.md`를 **Read하지 않는다.** 곧바로 `impl.md`를 Read해 실행한다. **자율 모드에서는 스킵 사실을 발화하지 않는다** ([발화 규율](../orchestrate.md#output-discipline-발화-규율)) — 완료 보고의 참고사항에 반영한다. 게이트 모드에서는 다음 Gate 프롬프트에 함께 적는다.
 
 ## Done Criteria
 
 아래 조건이 **모두** 충족되어야 이 phase가 완료된 것이다:
 
 - [ ] 요구사항이 명확하게 정리됨
-- [ ] Workspace 확인 완료 — main 모드: repo 루트 + working tree 상태 확인 / worktree 모드: 생성 + 진입 + 브랜치 일치
-- [ ] `plans/{identifier}.state.json` 생성, 모든 필드 값이 채워짐 (`speed` 포함)
+- [ ] Workspace 확인 완료 — main 모드: repo 루트 + working tree 상태 확인 / worktree 생성: gtr 생성 + 진입 + 브랜치 일치 / worktree 채택: 현재 worktree·브랜치 확인 (새 worktree 미생성)
+- [ ] `plans/{identifier}.state.json` 생성, 모든 필드 값이 채워짐 (`speed`·`worktreeCreated` 포함)
 - [ ] `plans/{identifier}.md` 작성 — normal: 7개 섹션 / fast: 3개 섹션. 어느 쪽이든 **Implementation Phases에 에이전트 배정 포함**
 - [ ] Gate 1 통과 — 자율 모드: 확인 없이 자동 진행 / 게이트 모드: 사용자가 플랜 확인
 - [ ] fast 모드: `gates.review = "skipped"`, `currentPhase = "impl"`로 기록됨

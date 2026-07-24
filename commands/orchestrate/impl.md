@@ -144,7 +144,7 @@ return { phases: done, files: done.flatMap(d => d.results.flatMap(r => r.files))
 
 ## 4. Integration Verification
 
-> **fast 모드는 이 섹션 전체를 스킵한다.** `speed === "fast"`면 lint·build·test·테스트 DB 준비를 하지 않고 곧바로 §5로 간다 — 검증은 done phase에서 **1회로 통합**해 실행된다 ([Speed Mode](../orchestrate.md#speed-mode---fast)). 스킵을 사용자에게 1줄로 보고한다: "fast 모드 — 검증은 done phase에서 1회 실행합니다".
+> **fast 모드는 이 섹션 전체를 스킵한다.** `speed === "fast"`면 lint·build·test·테스트 DB 준비를 하지 않고 곧바로 §5로 간다 — 검증은 done phase에서 **1회로 통합**해 실행된다 ([Speed Mode](../orchestrate.md#speed-mode---fast)). **자율 모드에서는 이 스킵을 발화하지 않는다** ([발화 규율](../orchestrate.md#output-discipline-발화-규율)) — done phase의 검증이 실제 실행되므로 완료 보고에 자연히 드러난다.
 >
 > 이때 `implVerifiedClean`은 **false로 남긴다.** done phase의 스킵 조건이 거짓이 되어 검증이 반드시 실행된다 — fast에서 검증이 통째로 사라지지 않도록 막는 장치다.
 

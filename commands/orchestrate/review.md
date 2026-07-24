@@ -158,12 +158,12 @@ React 프로젝트(Section 3 감지 조건 참조)이고 해당 에이전트가 
 
 ## 5. Aggregate & Fix (state의 `attempts.planFix`로 추적, 최대 2회)
 
-구조화된 findings를 severity별로 정리해 통합 리포트를 사용자에게 보여준다.
+구조화된 findings를 severity별로 정리한다. **자율 모드에서는 이 통합 리포트를 발화하지 않는다** ([발화 규율](../orchestrate.md#output-discipline-발화-규율)) — CRITICAL/HIGH는 아래 수정 루프로 처리하고 한도 초과 시에만 에스컬레이션한다. **게이트 모드에서는** 통합 리포트를 사용자에게 보여준다.
 
 | 조건 | 행동 |
 |------|------|
-| CRITICAL 또는 HIGH 발견 | `attempts.planFix` +1 → state Write → 플랜 수정·수정 내역 보고 → **해당 에이전트만** 재실행 |
-| MEDIUM 이하만 | **자율 모드**: 보고만 하고 자동 진행 · **게이트 모드**: 사용자에게 보고 후 진행 여부 확인 |
+| CRITICAL 또는 HIGH 발견 | `attempts.planFix` +1 → state Write → 플랜을 수정하고 **해당 에이전트만** 재실행 (수정 내역은 자율 모드에서 발화하지 않고 완료 보고에 합산 / 게이트 모드는 리포트에 포함) |
+| MEDIUM 이하만 | **자율 모드**: 발화하지 않고 자동 진행 (완료 보고에 합산) · **게이트 모드**: 사용자에게 보고 후 진행 여부 확인 |
 | `attempts.planFix` = 2인데 CRITICAL 잔존 | STOP: 사용자에게 수동 판단 요청 (자율 모드도 [에스컬레이션 조건](../orchestrate.md#autonomy-mode-게이트-자동-통과-vs-승인) 6번으로 멈춤) |
 
 > 카운터는 state에 영속된다 — 세션이 끊겨도 한도가 유지된다.
@@ -193,7 +193,7 @@ state JSON을 Read → 아래 필드 갱신 → Write:
 
 **`autonomy` 값에 따라 분기**한다:
 
-- **자율 모드 (`auto`)**: 리뷰 결과 요약을 보고하고 **즉시 자동 통과**해 impl phase로 진행한다 (모든 CRITICAL/HIGH가 해소된 경우). 사용자에게 "진행할까요?" 같은 확인을 **묻지 않는다.** 미해소 CRITICAL/HIGH가 남았을 때만 [에스컬레이션 조건](../orchestrate.md#autonomy-mode-게이트-자동-통과-vs-승인) 6번에 따라 멈추고 질문한다.
+- **자율 모드 (`auto`)**: [발화 규율](../orchestrate.md#output-discipline-발화-규율)에 따라 **리뷰 결과 요약을 출력하지 않고 즉시 자동 통과**해 impl phase로 진행한다 (모든 CRITICAL/HIGH가 해소된 경우). "진행할까요?" 같은 확인을 **묻지 않는다.** 미해소 CRITICAL/HIGH가 남았을 때만 [에스컬레이션 조건](../orchestrate.md#autonomy-mode-게이트-자동-통과-vs-승인) 6번에 따라 멈추고 질문한다.
 - **게이트 모드 (`gated`)**: **STOP.** 리뷰 결과 요약을 보여주고 사용자에게 확인을 요청한다.
 
 통과(자동 또는 확인)하면 → state JSON을 Read → 아래 필드 갱신 → Write:
